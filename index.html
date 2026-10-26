@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>FRAME PRO</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one-screen phone app — top bar / tab page / bottom tab bar. Deliberately single dark "monitor" theme. */
+:root{
+  --bg:#0A0B0D; --desk:#050607; --panel:#14161A; --panel2:#1B1E23; --line:#2A2E35;
+  --fg:#ECE8DF; --dim:#8D9098; --faint:#5A5E66;
+  --gold:#E3B55B; --ok:#3DDC84; --bad:#FF5A4E; --warn:#FFB020;
+  --f-disp:"Barlow Condensed","Arial Narrow",-apple-system,"PingFang SC",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--desk);color:var(--fg);font-family:var(--f-body);-webkit-font-smoothing:antialiased;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.app{position:relative;height:100%;max-width:440px;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+@media (min-width:600px){
+  body{display:flex;align-items:center;justify-content:center}
+  .app{width:420px;height:min(calc(100% - 40px),880px);border:1px solid var(--line);border-radius:34px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+}
+/* top bar */
+.topbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:10px 8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--f-disp);font-weight:700;font-size:20px;letter-spacing:.08em}
+.brand b{color:var(--gold);font-weight:700}
+.tb-sub{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+main{flex:1;min-height:0;position:relative}
+.page{position:absolute;inset:0;display:flex;flex-direction:column}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* tab bar */
+.tabbar{flex:none;display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line);background:rgba(14,15,18,.96);padding-block:6px calc(6px + env(safe-area-inset-bottom,0px));padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;color:var(--faint);font-size:11px;transition:color .2s}
+.tabbar button svg{width:24px;height:24px}
+.tabbar button[aria-selected="true"]{color:var(--gold)}
+/* chips */
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;height:30px;padding:0 12px;border-radius:15px;border:1px solid var(--line);background:var(--panel);color:var(--dim);font-size:12.5px;white-space:nowrap;transition:all .18s}
+.chip[aria-pressed="true"]{border-color:var(--gold);color:var(--bg);background:var(--gold);font-weight:600}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:2px}
+.seg button{flex:1;height:28px;border-radius:8px;font-family:var(--f-mono);font-size:12px;color:var(--dim)}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--gold);box-shadow:inset 0 0 0 1px rgba(227,181,91,.35)}
+
+/* ===== Viewfinder ===== */
+.vf-top{flex:none;display:flex;flex-direction:column;gap:8px;padding-block:2px 8px}
+.stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding-block:4px}
+.frame{position:relative;overflow:hidden;background:#000;border-radius:4px;touch-action:none;cursor:grab;box-shadow:0 0 0 1px #000,0 0 0 2px #23262c}
+.frame:active{cursor:grabbing}
+.media{position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;max-width:none}
+.media.mirror{transform:scaleX(-1)}
+.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ov text{font-family:var(--f-body);paint-order:stroke;stroke:rgba(0,0,0,.65);stroke-width:3px;stroke-linejoin:round}
+.hud{position:absolute;pointer-events:none;background:rgba(0,0,0,.42);padding:3px 6px;border-radius:6px;backdrop-filter:blur(4px);line-height:1.35;font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;color:rgba(255,255,255,.85);text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.hud.tl{top:10px;left:10px;display:flex;align-items:center;gap:6px}
+.hud.tr{top:10px;right:10px;text-align:right}
+.hud.bl{bottom:46px;left:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.dot.live{background:var(--bad);box-shadow:0 0 6px var(--bad);animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.25}}
+.corner{position:absolute;width:16px;height:16px;border:0 solid rgba(255,255,255,.75);pointer-events:none}
+.corner.a{top:6px;left:6px;border-top-width:2px;border-left-width:2px}
+.corner.b{top:6px;right:6px;border-top-width:2px;border-right-width:2px}
+.corner.c{bottom:6px;left:6px;border-bottom-width:2px;border-left-width:2px}
+.corner.d{bottom:6px;right:6px;border-bottom-width:2px;border-right-width:2px}
+.verdict{position:absolute;top:44px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);padding:4px 11px;border-radius:12px;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.zoom{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:4px;padding:3px;border-radius:16px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px)}
+.zoom button{min-width:30px;height:26px;border-radius:13px;font-family:var(--f-mono);font-size:10.5px;color:#fff}
+.zoom button[aria-pressed="true"]{background:rgba(0,0,0,.6);color:var(--gold);font-weight:600}
+.tipbar{flex:none;display:flex;gap:10px;align-items:flex-start;padding-block:8px 6px}
+.tipbar .k{flex:none;font-family:var(--f-disp);font-weight:700;font-size:15px;letter-spacing:.04em;color:var(--gold);line-height:1.35}
+.tipbar .v{font-size:12.5px;line-height:1.45;color:var(--fg);min-width:0}
+.srcs{flex:none;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:6px}
+.srcs::-webkit-scrollbar{display:none}
+.src{flex:none;width:46px;height:46px;border-radius:9px;overflow:hidden;border:1.5px solid transparent;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9.5px;color:var(--dim)}
+.src img{width:100%;height:100%;object-fit:cover}
+.src{position:relative}
+.src.m::after{content:"";position:absolute;right:3px;top:3px;width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 1.5px rgba(0,0,0,.6)}
+.sdiv{flex:none;width:1px;align-self:stretch;margin:6px 2px;background:var(--line)}
+.nextb{flex:none;margin-left:auto;display:flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:14px;border:1px solid rgba(227,181,91,.5);color:var(--gold);font-size:11.5px;white-space:nowrap}
+.frame.matched .ov .figg{opacity:.32}
+.src[aria-pressed="true"]{border-color:var(--gold)}
+.src svg{width:18px;height:18px}
+.ctrl{flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding-block:6px 10px}
+.roll{justify-self:start;width:46px;height:46px;border-radius:10px;border:1.5px solid var(--line);overflow:hidden;background:var(--panel);display:grid;place-items:center;color:var(--faint);position:relative}
+.roll img{width:100%;height:100%;object-fit:cover}
+.roll .n{position:absolute;right:-1px;top:-1px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--gold);color:#000;font-size:10px;font-family:var(--f-mono);font-weight:600;display:grid;place-items:center}
+.shutter{width:72px;height:72px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center;background:transparent}
+.shutter span{width:56px;height:56px;border-radius:50%;background:#fff;transition:transform .08s}
+.shutter:active span,.shutter.press span{transform:scale(.86);background:#ddd}
+.flip{justify-self:end;width:46px;height:46px;border-radius:50%;background:var(--panel2);display:grid;place-items:center;color:var(--fg)}
+.flip svg{width:22px;height:22px}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:40}
+.flash.go{animation:flash .32s ease-out}
+@keyframes flash{0%{opacity:.95}100%{opacity:0}}
+
+/* ===== Section headers / cards ===== */
+.h1{font-family:var(--f-disp);font-weight:700;font-size:30px;letter-spacing:.02em;line-height:1.05;text-wrap:balance}
+.lede{color:var(--dim);font-size:13px;line-height:1.55;margin-top:6px}
+.eyebrow{font-family:var(--f-mono);font-size:10px;letter-spacing:.16em;color:var(--gold);text-transform:uppercase}
+.sec{display:flex;flex-direction:column;gap:12px;padding-block:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px}
+
+/* ===== Cutlines ===== */
+.cut-wrap{display:grid;grid-template-columns:1fr;gap:12px}
+.cut-svg{width:100%;height:auto;display:block}
+.cut-svg .ln{cursor:pointer}
+.cut-svg text{font-family:var(--f-body)}
+.cut-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cut-item{display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);text-align:left;font-size:12.5px;min-width:0}
+.cut-item i{flex:none;width:10px;height:10px;border-radius:2px}
+.cut-item[aria-pressed="true"]{border-color:currentColor}
+.cut-item.okc{color:var(--ok)} .cut-item.badc{color:var(--bad)}
+.cut-item span{color:var(--fg)}
+.detail{padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:11px;font-size:11px;font-weight:600;width:max-content}
+.badge.ok{background:rgba(61,220,132,.14);color:var(--ok)}
+.badge.bad{background:rgba(255,90,78,.14);color:var(--bad)}
+.badge.warn{background:rgba(255,176,32,.14);color:var(--warn)}
+.detail h3{font-size:18px;font-weight:700;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.detail h3 small{font-family:var(--f-mono);font-size:11px;font-weight:400;color:var(--dim)}
+.detail p{font-size:13px;line-height:1.6;color:#CFCBC2}
+.verse{font-family:var(--f-disp);font-size:17px;font-weight:600;color:var(--gold);letter-spacing:.03em}
+.verse::before{content:"口诀 ";font-family:var(--f-mono);font-size:10px;color:var(--dim);letter-spacing:.1em;font-weight:400}
+.motto{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-radius:14px;border:1px dashed rgba(227,181,91,.45);font-family:var(--f-disp);font-size:20px;font-weight:700;letter-spacing:.12em;color:var(--gold)}
+.trap{overflow:hidden}
+.trap svg{display:block;width:100%;height:auto}
+.trap .body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.trap .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.trap h4{font-size:15px}
+.ab{display:flex;gap:4px;background:var(--bg);padding:2px;border-radius:9px;border:1px solid var(--line)}
+.ab button{height:26px;padding:0 10px;border-radius:7px;font-size:12px;color:var(--dim)}
+.ab button[aria-pressed="true"].x{background:rgba(255,90,78,.18);color:var(--bad)}
+.ab button[aria-pressed="true"].o{background:rgba(61,220,132,.16);color:var(--ok)}
+.trap p{font-size:12.5px;line-height:1.55;color:#CFCBC2}
+
+/* ===== Gallery ===== */
+.gal{display:grid;grid-template-columns:1fr;gap:16px;padding-block:4px 20px}
+.gcard{overflow:hidden}
+.gimg{position:relative;background:#000}
+.gimg img{display:block;width:100%;height:auto}
+.gimg svg{position:absolute;inset:0;width:100%;height:100%;transition:opacity .25s}
+.gimg svg.off{opacity:0}
+.gimg svg text{font-family:var(--f-body);paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:7px;stroke-linejoin:round}
+.gscene{position:absolute;left:10px;top:10px;font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);color:#fff}
+.gbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.gtitle{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.gtitle h3{font-size:16px;font-weight:700}
+.gmeta{font-family:var(--f-mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+.gtip{font-size:12.5px;color:#CFCBC2;line-height:1.5}
+.gact{display:flex;gap:8px;margin-top:2px}
+.xbtn{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);font-size:12px;color:var(--dim)}
+.xbtn .sw{width:28px;height:16px;border-radius:8px;background:var(--line);position:relative;transition:background .2s}
+.xbtn .sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .2s}
+.xbtn[aria-pressed="true"]{color:var(--fg)}
+.xbtn[aria-pressed="true"] .sw{background:var(--gold)}
+.xbtn[aria-pressed="true"] .sw::after{transform:translateX(12px)}
+.gobtn{flex:1;height:34px;border-radius:10px;background:var(--gold);color:#16130b;font-weight:700;font-size:13px}
+.credit{font-size:11px;color:var(--faint);text-align:center;padding-bottom:16px;line-height:1.5}
+
+.filt{display:flex;flex-direction:column;gap:10px}
+.scales{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.sbtn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0 7px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--dim);font-size:11px;min-width:0}
+.sbtn svg{width:30px;height:38px;display:block}
+.sbtn[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:rgba(227,181,91,.08)}
+.frow{display:flex;align-items:center;gap:10px;min-width:0}
+.fl{flex:none;font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;color:var(--faint)}
+.frow .chips{min-width:0;flex:1}
+.frow .chip{height:28px;font-size:12px;padding:0 11px}
+.fcount{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--dim)}
+.fcount b{color:var(--fg);font-family:var(--f-mono)}
+.fcount button{font-size:12px;color:var(--gold)}
+.gscale{position:absolute;right:10px;top:10px;font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(227,181,91,.92);color:#16130b;font-weight:600}
+.gtags{display:flex;gap:6px;flex-wrap:wrap}
+.gtags span{font-size:10.5px;padding:2px 7px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
+.gtags .ts{border-color:transparent;background:var(--panel2);color:var(--fg)}
+.gtags .tp{border-color:transparent;background:rgba(227,181,91,.16);color:var(--gold);font-weight:600}
+.empty{padding:28px 16px;text-align:center;color:var(--dim);font-size:13px;line-height:1.6}
+
+.subs{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-block:2px}
+.subs::-webkit-scrollbar{display:none}
+.sub{flex:none;width:68px;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;color:var(--dim)}
+.sub img{width:64px;height:64px;border-radius:14px;object-fit:cover;border:2px solid transparent;display:block}
+.sub[aria-pressed="true"]{color:var(--gold);font-weight:600}
+.sub[aria-pressed="true"] img{border-color:var(--gold)}
+.sd-tips{display:grid;grid-template-columns:1fr;gap:10px;padding:0 14px 14px}
+.tipg{display:grid;grid-template-columns:28px 1fr;gap:2px 10px}
+.tipg .ic{grid-row:span 2;width:28px;height:28px;border-radius:8px;background:var(--panel2);display:grid;place-items:center;color:var(--gold)}
+.tipg .ic svg{width:16px;height:16px}
+.tipg h4{font-size:13px;font-weight:700}
+.tipg ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.tipg li{font-size:12.5px;line-height:1.55;color:#CFCBC2}
+.sd-verse{margin:0 14px 14px;padding:10px 12px;border-radius:10px;background:rgba(227,181,91,.08);border:1px dashed rgba(227,181,91,.4)}
+
+/* ===== AI ===== */
+.ai-in{padding:12px;display:flex;flex-direction:column;gap:10px}
+.ai-in textarea{width:100%;min-height:76px;resize:none;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:12px;padding:10px 12px;font:inherit;font-size:14px;line-height:1.5}
+.ai-in textarea::placeholder{color:var(--faint)}
+.gen{height:42px;border-radius:12px;background:var(--gold);color:#16130b;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.gen:disabled{opacity:.6}
+.model{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:10.5px;color:var(--dim)}
+.model .pill{padding:2px 7px;border-radius:6px;border:1px solid var(--line);color:var(--fg)}
+.plan{display:flex;flex-direction:column;gap:10px}
+.plan-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.plan-head h3{font-size:17px;font-weight:700}
+.pc{padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.pc .no{grid-row:span 2;font-family:var(--f-disp);font-size:26px;font-weight:700;color:var(--gold);line-height:1}
+.pc h4{font-size:13.5px;font-weight:700;color:var(--fg)}
+.pc ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.pc li{font-size:13px;line-height:1.55;color:#CFCBC2;padding-left:12px;position:relative}
+.pc li::before{content:"";position:absolute;left:0;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--faint)}
+.pc li.g::before{background:var(--ok)} .pc li.r::before{background:var(--bad)}
+.pc .verse2{font-family:var(--f-disp);font-size:17px;font-weight:600;color:var(--gold);line-height:1.45;letter-spacing:.02em}
+.plan-act{display:flex;gap:8px}
+.ghost{flex:1;height:38px;border-radius:11px;border:1px solid var(--line);font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.scan{padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--dim);font-size:12.5px}
+.scan .bar{width:100%;height:3px;border-radius:2px;background:var(--line);overflow:hidden;position:relative}
+.scan .bar::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:sweep 1s linear infinite}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+
+/* sheet & toast */
+.toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);max-width:calc(100% - 40px);background:rgba(30,32,37,.96);border:1px solid var(--line);color:var(--fg);font-size:12.5px;line-height:1.45;padding:9px 14px;border-radius:12px;opacity:0;pointer-events:none;transition:all .25s;z-index:60;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.sheet{position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
+.sheet .in{width:100%;max-height:78%;overflow:auto;background:var(--panel);border-radius:20px 20px 0 0;border-top:1px solid var(--line);padding-block:12px calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+.rgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.rgrid figure{margin:0}
+.rgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block;background:#000}
+.rgrid figcaption{font-family:var(--f-mono);font-size:9.5px;color:var(--dim);margin-top:3px}
+.big{width:100%;border-radius:10px;display:block;margin-top:10px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E3B55B" stroke-width="1.6"><circle cx="12" cy="12" r="9.5"/><path d="M12 2.5 15.5 9M21.5 12l-7 1M16.8 20.2 12 15M7.2 20.2 9 13.5M2.5 12l6.5-2.5M7.2 3.8 11 9"/></svg>
+      <span>FRAME <b>PRO</b></span>
+    </div>
+    <div class="tb-sub" id="tbSub">VF-01 · Viewfinder</div>
+  </header>
+
+  <main>
+    <!-- 1. Viewfinder -->
+    <section class="page" id="tab-vf">
+      <div class="vf-top gut">
+        <div class="seg" id="ratioSeg" role="group" aria-label="画幅"></div>
+      </div>
+      <div class="stage gut" id="stage">
+        <div class="frame" id="frame">
+          <img class="media" id="mImg" alt="取景画面">
+          <video class="media" id="mVid" playsinline muted hidden></video>
+          <svg class="ov" id="ov"></svg>
+          <span class="corner a"></span><span class="corner b"></span><span class="corner c"></span><span class="corner d"></span>
+          <div class="hud tl"><span class="dot" id="hudDot"></span><span id="hudSrc">SAMPLE</span></div>
+          <div class="hud tr" id="hudTr">4:5<br>REF 85mm</div>
+          <div class="hud bl" id="hudBl">ISO 100 · 1/250 · ƒ2.0</div>
+          <div class="zoom" id="zoomBox"></div>
+          <div class="verdict" id="verdict" hidden></div>
+        </div>
+      </div>
+      <div class="gut">
+        <div class="tipbar"><div class="k" id="tipK">三分法</div><div class="v" id="tipV"></div><button class="nextb" id="nextBtn" hidden></button></div>
+        <div class="chips" id="guideChips" role="group" aria-label="构图辅助线"></div>
+        <div class="srcs" id="srcs"></div>
+        <div class="ctrl">
+          <button class="roll" id="rollBtn" aria-label="胶卷"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg></button>
+          <button class="shutter" id="shutter" aria-label="快门"><span></span></button>
+          <button class="flip" id="flipBtn" aria-label="翻转镜头"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9.5 13.5a2.5 2.5 0 0 0 4.6 1.3M14.5 12.5a2.5 2.5 0 0 0-4.6-1.3"/><path d="M14 15l.3-1.8 1.7.6M10 11l-.3 1.8-1.7-.6"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Cutlines -->
+    <section class="page scroll" id="tab-cut" hidden>
+      <div class="gut sec">
+        <div>
+          <div class="eyebrow">Cutline Spec · 切线标尺</div>
+          <h1 class="h1">绿线可以切，红线别碰</h1>
+          <p class="lede">点按人体标尺上的任意一条线，查看从这里裁切后的效果、适用景别和指导口诀。</p>
+        </div>
+        <div class="motto">宁裁肉 · 不切关节</div>
+        <div class="card" style="padding:8px 4px 4px"><svg class="cut-svg" id="cutSvg" viewBox="0 0 360 640" role="img" aria-label="人体切线标尺"></svg></div>
+        <div class="card detail" id="cutDetail"></div>
+        <div class="cut-list" id="cutList"></div>
+      </div>
+      <div class="gut sec" style="padding-top:4px">
+        <div>
+          <div class="eyebrow">Environment Traps · 环境死穴</div>
+          <h2 class="h1" style="font-size:24px">两个最常见的环境人像事故</h2>
+        </div>
+        <div class="card trap" id="trapHorizon"></div>
+        <div class="card trap" id="trapPole"></div>
+      </div>
+    </section>
+
+    <!-- 3. Gallery -->
+    <section class="page scroll" id="tab-gal" hidden>
+      <div class="gut sec" style="padding-bottom:6px">
+        <div>
+          <div class="eyebrow">X-Ray Gallery · 透视相册</div>
+          <h1 class="h1">看穿好照片背后的骨架</h1>
+        </div>
+        <div class="filt">
+          <div class="scales" id="fScale" role="group" aria-label="人物比例"></div>
+          <div class="frow"><span class="fl">场景</span><div class="chips" id="fScene" role="group" aria-label="场景"></div></div>
+          <div class="frow"><span class="fl">构图</span><div class="chips" id="fComp" role="group" aria-label="构图"></div></div>
+          <div class="fcount" id="fCount"></div>
+        </div>
+      </div>
+      <div class="gut"><div class="gal" id="gal"></div>
+        <p class="credit">样片来自 Unsplash、Pexels、Shopify Burst 等免费图库（经开源网页模板分发），长边最高 1800px。<br>正式上线前请逐张核对授权。透视线为构图教学标注。</p>
+      </div>
+    </section>
+
+    <!-- 4. Subjects -->
+    <section class="page scroll" id="tab-sub" hidden>
+      <div class="gut sec">
+        <div>
+          <div class="eyebrow">Subjects · 题材百科</div>
+          <h1 class="h1">树、椅子、一杯咖啡，也有拍法</h1>
+          <p class="lede">选一个题材，看机位、构图、光线，以及怎么让人物一起入镜。</p>
+        </div>
+        <div class="chips" id="subCats" role="group" aria-label="题材分类"></div>
+        <div class="subs" id="subStrip"></div>
+        <div id="subDetail"></div>
+      </div>
+    </section>
+
+    <!-- 5. AI Coach -->
+    <section class="page scroll" id="tab-ai" hidden>
+      <div class="gut sec">
+        <div>
+          <div class="eyebrow">AI Composition Coach · 机位军师</div>
+          <h1 class="h1">说出现场，给你一套机位方案</h1>
+        </div>
+        <div class="card ai-in">
+          <label for="aiInput" class="tb-sub" style="letter-spacing:.08em">描述拍摄现场</label>
+          <textarea id="aiInput" placeholder="地点、光线、人物、想要的感觉。例如：傍晚海边栈桥，逆光，女生穿白裙"></textarea>
+          <div class="chips" id="aiPresets"></div>
+          <button class="gen" id="genBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+            生成机位方案</button>
+          <div class="model"><span class="pill">Gemini 3 Flash</span><span>原型阶段：使用内置示例方案，接口待接入</span></div>
+        </div>
+        <div id="planBox"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" role="tablist">
+    <button role="tab" data-tab="vf" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18" stroke-opacity=".45"/></svg>取景器</button>
+    <button role="tab" data-tab="cut" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v7m0 0-3 7m3-7 3 7M8 10h8"/><path d="M3 9.5h3M3 14h3M18 6h3M18 18h3" stroke-width="2"/></svg>切线标尺</button>
+    <button role="tab" data-tab="gal" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 17 5-5 4 4 3-3 6 6"/><path d="M3 9h18M9 3v18" stroke-dasharray="2 2" stroke-opacity=".6"/></svg>透视相册</button>
+    <button role="tab" data-tab="sub" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 21v-7"/><path d="M12 14c-4.5 0-7-2.6-7-6.2C5 5 8 3 12 3s7 2 7 4.8C19 11.4 16.5 14 12 14z"/><path d="M8 21h8"/></svg>题材</button>
+    <button role="tab" data-tab="ai" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>AI 军师</button>
+  </nav>
+
+  <div class="flash" id="flash"></div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="sheet" id="sheet" hidden><div class="in gut" id="sheetIn"></div></div>
+  <input type="file" id="fileUp" accept="image/*" hidden>
+  <input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+</div>
+
+<script>
+const IMG={"snow": "img/snow.jpg", "cliff": "img/cliff.jpg", "reflect": "img/reflect.jpg", "sroad": "img/sroad.jpg", "summit": "img/summit.jpg", "hiker": "img/hiker.jpg", "canyon": "img/canyon.jpg", "friends": "img/friends.jpg", "sea": "img/sea.jpg", "beach": "img/beach.jpg", "palm": "img/palm.jpg", "pier": "img/pier.jpg", "city": "img/city.jpg", "neonman": "img/neonman.jpg", "fairy": "img/fairy.jpg", "girl": "img/girl.jpg", "redsweater": "img/redsweater.jpg", "studiocolor": "img/studiocolor.jpg", "cafe": "img/cafe.jpg", "couple": "img/couple.jpg", "lakeman": "img/lakeman.jpg", "rooftop": "img/rooftop.jpg", "mountainman": "img/mountainman.jpg", "alone": "img/alone.jpg", "daylight": "img/daylight.jpg", "peace": "img/peace.jpg", "creator": "img/creator.jpg", "curly": "img/curly.jpg", "reader": "img/reader.jpg", "nya": "img/nya.jpg", "tree": "img/tree.jpg", "palmroad": "img/palmroad.jpg", "flower": "img/flower.jpg", "sky": "img/sky.jpg", "mirror": "img/mirror.jpg", "chair": "img/chair.jpg", "coffee": "img/coffee.jpg", "coffee2": "img/coffee2.jpg", "food": "img/food.jpg", "flatlay": "img/flatlay.jpg", "lights": "img/lights.jpg", "arch": "img/arch.jpg", "arch2": "img/arch2.jpg", "street": "img/street.jpg", "car": "img/car.jpg", "flowers": "img/flowers.jpg", "citynight": "img/citynight.jpg"};
+const THUMB={"snow": "img/t/snow.jpg", "cliff": "img/t/cliff.jpg", "reflect": "img/t/reflect.jpg", "sroad": "img/t/sroad.jpg", "summit": "img/t/summit.jpg", "hiker": "img/t/hiker.jpg", "canyon": "img/t/canyon.jpg", "friends": "img/t/friends.jpg", "sea": "img/t/sea.jpg", "beach": "img/t/beach.jpg", "palm": "img/t/palm.jpg", "pier": "img/t/pier.jpg", "city": "img/t/city.jpg", "neonman": "img/t/neonman.jpg", "fairy": "img/t/fairy.jpg", "girl": "img/t/girl.jpg", "redsweater": "img/t/redsweater.jpg", "studiocolor": "img/t/studiocolor.jpg", "cafe": "img/t/cafe.jpg", "couple": "img/t/couple.jpg", "lakeman": "img/t/lakeman.jpg", "rooftop": "img/t/rooftop.jpg", "mountainman": "img/t/mountainman.jpg", "alone": "img/t/alone.jpg", "daylight": "img/t/daylight.jpg", "peace": "img/t/peace.jpg", "creator": "img/t/creator.jpg", "curly": "img/t/curly.jpg", "reader": "img/t/reader.jpg", "nya": "img/t/nya.jpg", "tree": "img/t/tree.jpg", "palmroad": "img/t/palmroad.jpg", "flower": "img/t/flower.jpg", "sky": "img/t/sky.jpg", "mirror": "img/t/mirror.jpg", "chair": "img/t/chair.jpg", "coffee": "img/t/coffee.jpg", "coffee2": "img/t/coffee2.jpg", "food": "img/t/food.jpg", "flatlay": "img/t/flatlay.jpg", "lights": "img/t/lights.jpg", "arch": "img/t/arch.jpg", "arch2": "img/t/arch2.jpg", "street": "img/t/street.jpg", "car": "img/t/car.jpg", "flowers": "img/t/flowers.jpg", "citynight": "img/t/citynight.jpg"};
+const IMGDIM={"snow": [1500, 1000], "cliff": [1800, 1054], "reflect": [1800, 1200], "sroad": [1500, 1000], "summit": [1500, 1000], "hiker": [1500, 1000], "canyon": [1200, 900], "friends": [1500, 1000], "sea": [1280, 853], "beach": [1280, 853], "palm": [1200, 948], "pier": [1280, 853], "city": [1500, 1000], "neonman": [1200, 675], "fairy": [1280, 853], "girl": [1200, 1800], "redsweater": [934, 1401], "studiocolor": [934, 1401], "cafe": [1280, 853], "couple": [1800, 1200], "lakeman": [1800, 1201], "rooftop": [1800, 1201], "mountainman": [1800, 1201], "alone": [1800, 1078], "daylight": [1800, 1199], "peace": [1800, 1114], "creator": [1800, 1800], "curly": [1800, 1078], "reader": [1800, 1200], "nya": [1800, 1800], "tree": [1800, 1200], "palmroad": [1440, 960], "flower": [1280, 853], "sky": [1740, 900], "mirror": [1200, 900], "chair": [1800, 1027], "coffee": [1280, 853], "coffee2": [1280, 853], "food": [1200, 1800], "flatlay": [1800, 1422], "lights": [1280, 853], "arch": [1440, 957], "arch2": [1440, 960], "street": [1440, 960], "car": [1440, 960], "flowers": [1800, 1200], "citynight": [1800, 1125]};
+const $=s=>document.querySelector(s);
+const C={g:'#3DDC84',r:'#FF5A4E',y:'#E3B55B',o:'#FFB020',w:'rgba(255,255,255,.8)'};
+const PHI=(1+Math.sqrt(5))/2;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- data ---------- */
+const RATIOS=['4:5','9:16','16:9','3:4','1:1'];
+const ZOOMS=[{z:1,l:'1×'},{z:1.5,l:'1.5×'},{z:2,l:'2×'},{z:3,l:'3×'}];
+const GUIDES=[
+ {id:'thirds',name:'三分法',tip:'眼睛压在上三分线，人脸落在交点，视线前方多留空间。'},
+ {id:'small',name:'大景小人',tip:'人物只占画高 1/9，地平线放在下三分，把天地留给风景。'},
+ {id:'horizon',name:'地平线避割喉',tip:'蹲低机位，让地平线落到腰线以下，绝不横穿脖子和眼睛。'},
+ {id:'sroad',name:'S型引导',tip:'让公路、步道或河流从画面底部蜿蜒入画，人站在弯道尽头。'},
+ {id:'vp',name:'消失点',tip:'栏杆、步道、街道汇向一点，人物站在汇聚线上更有纵深。'},
+ {id:'diag',name:'对角线',tip:'让树干、楼梯、身体或手臂沿对角线延伸，画面立刻有动感。'},
+ {id:'sym',name:'对称 / 中心',tip:'人站中轴，左右元素对称；倒影场景把水岸线放在正中。'},
+ {id:'frame',name:'框架构图',tip:'借门窗、拱门、树枝、灯管把人框在中间，视线自然聚焦。'},
+ {id:'space',name:'留白',tip:'大面积天空、墙面或水面留给呼吸，人物视线方向多留空。'},
+ {id:'layers',name:'三段式景深',tip:'前景虚化遮挡，中景放人物，背景交代环境，层次立刻出来。'},
+ {id:'cowboy',name:'七分身',tip:'切在大腿中段，头顶留一拳，最显腿长的半身景别。'},
+ {id:'full',name:'全身拉长腿',tip:'镜头放到腰部高度微俯，脚尖贴近下边，头顶少留白。'},
+ {id:'spiral',name:'黄金螺旋',tip:'人脸放在螺旋眼上。再点一次可切换螺旋方向。'},
+ {id:'sit',name:'坐姿三角',tip:'头、膝、臀连成三角，单膝抬起，身体侧对镜头。'},
+ {id:'cut',name:'切线标尺',tip:'绿线可切，红线是关节雷区：宁裁肉，不切关节。'},
+ {id:'none',name:'关闭',tip:'纯净取景，不叠加辅助线。'}
+];
+const GMAP=Object.fromEntries(GUIDES.map(g=>[g.id,g]));
+const SCENES=[['all','全部场景'],['mount','山野高原'],['sea','海滨沙滩'],['lake','湖泊水景'],['city','城市街头'],['night','夜景霓虹'],['studio','室内棚拍']];
+const SCALES=[['all','全部'],['close','特写'],['half','半身'],['cowboy','七分身'],['full','全身'],['tiny','大景小人']];
+const COMPS=[['all','全部构图'],['thirds','三分法'],['lead','引导线'],['sym','对称 / 中心'],['diag','对角线'],['frame','框架'],['space','留白'],['horizon','地平线'],['layers','三段式'],['spiral','黄金螺旋'],['cut','切线规范']];
+const PHOTOS=[
+ {k:'snow',title:'雪山步道 · 大景小人',sc:'mount',pr:'tiny',prt:'人占画高 ≈ 1/9',cp:['lead'],ratio:'16:9',guide:'small',focal:'24mm',fx:.42,fy:.5,
+  tip:'人只占一点点，雪道当引导线把视线送到人身上。',
+  ops:[{t:'curve',pts:[[.2,1],[.3,.8],[.37,.62],[.4,.56]],c:'y'},{t:'h',y:.5,c:'w',l:'雪山脊线',dash:1},{t:'box',x:.383,y:.47,w:.04,h:.085,c:'g',l:'人物 ≈ 画高 1/9'}]},
+ {k:'cliff',title:'海崖远眺 · 人景 1:12',sc:'sea',pr:'tiny',prt:'人占画高 ≈ 1/12',cp:['diag','space'],ratio:'16:9',guide:'small',focal:'24mm',fx:.55,fy:.5,
+  tip:'人站在山脊线尽头，海湾占据左侧大片留白。',
+  ops:[{t:'curve',pts:[[.46,.64],[.62,.56],[.82,.44],[1,.32]],c:'y',l:''},{t:'h',y:.48,c:'w',l:'海平线',dash:1},{t:'box',x:.585,y:.425,w:.03,h:.075,c:'g',l:'人物 ≈ 1/12'},{t:'pt',x:.22,y:.72,c:'w',l:'海湾留白'}]},
+ {k:'reflect',title:'星空湖面 · 倒影对称',sc:'lake',pr:'tiny',prt:'建议人占 ≈ 1/9',cp:['sym','horizon'],ratio:'16:9',guide:'sym',focal:'24mm',fx:.5,fy:.5,
+  tip:'水岸线放正中，上实下虚 1:1；人物站在岸边一侧，不挡山峰。',
+  ops:[{t:'h',y:.5,c:'y',l:'对称轴 · 水岸线'},{t:'box',x:.66,y:.405,w:.025,h:.09,c:'g',l:'建议站位'},{t:'pt',x:.5,y:.2,c:'w',l:'银河在上 · 倒影在下'}]},
+ {k:'sroad',title:'山谷公路 · S型引导',sc:'mount',pr:'tiny',prt:'建议人占 ≈ 1/12',cp:['lead'],ratio:'9:16',guide:'sroad',focal:'24mm',fx:.5,fy:.65,
+  tip:'路从画面底部蜿蜒入画，请人站在第一个弯道处。',
+  ops:[{t:'curve',pts:[[.5,1],[.55,.9],[.47,.78],[.53,.68],[.5,.6]],c:'y',l:'S 型公路'},{t:'pt',x:.5,y:.4,c:'w',l:'消失点 · 逆光太阳'},{t:'box',x:.485,y:.6,w:.035,h:.07,c:'g',l:'人物站这里'}]},
+ {k:'summit',title:'山巅日出 · 全身入画',sc:'mount',pr:'full',prt:'人占画高 ≈ 1/2',cp:['sym','horizon'],ratio:'4:5',guide:'full',focal:'24mm',fx:.5,fy:.6,
+  tip:'脚尖贴近下边，人立在中轴。云海线压在胸口，抬高机位会更好。',
+  ops:[{t:'v',x:.5,c:'w',dash:1},{t:'box',x:.455,y:.36,w:.09,h:.57,c:'g',l:'人物 ≈ 画高 1/2'},{t:'h',y:.505,c:'o',l:'云海线过胸 · 可抬高机位'},{t:'h',y:.93,c:'g',l:'✓ 脚底贴近下边'}]},
+ {k:'hiker',title:'落日剪影 · 竖三分',sc:'mount',pr:'full',prt:'人占画高 ≈ 3/5',cp:['thirds'],ratio:'16:9',guide:'thirds',focal:'50mm',fx:.4,fy:.5,
+  tip:'剪影站在左三分竖线上，山脊压在下三分。',
+  ops:[{t:'thirds'},{t:'v',x:.333,c:'y',l:'剪影落左三分线'},{t:'h',y:.667,c:'y',l:'山脊 · 下三分'}]},
+ {k:'canyon',title:'马蹄湾 · 环形框架',sc:'mount',pr:'full',prt:'坐姿 · 人占 ≈ 3/5',cp:['frame','sym'],ratio:'4:5',guide:'frame',focal:'24mm',fx:.5,fy:.55,
+  tip:'从背后微俯拍，河湾绕人一圈形成天然画框；人坐在中轴。',
+  ops:[{t:'ell',x:.42,y:.47,rx:.36,ry:.27,c:'y',l:'河湾环绕 = 天然框架'},{t:'box',x:.4,y:.33,w:.23,h:.6,c:'g',l:'背影坐姿'},{t:'v',x:.5,c:'w',dash:1}]},
+ {k:'friends',title:'山谷观景台 · 三段式',sc:'mount',pr:'half',prt:'背影 · 人占 ≈ 1/3',cp:['layers'],ratio:'16:9',guide:'layers',focal:'35mm',fx:.5,fy:.55,
+  tip:'人物背影做前景，云雾山谷做中景，山体做背景。',
+  ops:[{t:'bands',b:[[0,.42,'背景 · 山体交代环境'],[.42,.64,'中景 · 云雾山谷'],[.64,1,'前景 · 人物背影']]}]},
+ {k:'sea',title:'海边背影 · 地平线穿头',sc:'sea',pr:'half',prt:'背影 · 人占 ≈ 1/2',cp:['horizon','cut'],ratio:'4:5',guide:'horizon',focal:'35mm',fx:.5,fy:.55,
+  tip:'海平线正好从头部穿过。蹲低一点，让它落到腰下。',
+  ops:[{t:'h',y:.47,c:'r',l:'✗ 海平线穿过头部'},{t:'box',x:.445,y:.465,w:.11,h:.17,c:'r'},{t:'h',y:.84,c:'g',l:'✓ 蹲低机位：海平线落到腰下'}]},
+ {k:'beach',title:'海滩回眸 · 眼睛交点',sc:'sea',pr:'close',prt:'脸占画高 ≈ 1/3',cp:['thirds'],ratio:'4:5',guide:'thirds',focal:'50mm',fx:.58,fy:.4,
+  tip:'眼睛压上三分线，脸落右上交点，手臂抬起不切手腕。',
+  ops:[{t:'thirds'},{t:'pt',x:.6,y:.29,c:'y',l:'眼睛落在右上交点'}]},
+ {k:'palm',title:'椰树躺姿 · 对角线',sc:'sea',pr:'full',prt:'躺姿 · 人占画宽 ≈ 1/3',cp:['diag'],ratio:'4:5',guide:'diag',focal:'35mm',fx:.35,fy:.55,
+  tip:'倾斜的椰树干从左下切到右上，人顺着树干躺下，身体延长对角线。',
+  ops:[{t:'curve',pts:[[.02,.69],[.3,.58],[.55,.45],[.8,.27]],c:'y',l:'对角线 · 椰树干'},{t:'box',x:.02,y:.5,w:.3,h:.15,c:'g',l:'人顺着树干躺'},{t:'h',y:.77,c:'w',l:'海平线 · 下三分',dash:1}]},
+ {k:'pier',title:'湖边栈桥 · 坐姿三角',sc:'lake',pr:'full',prt:'坐姿 · 人占 ≈ 2/3',cp:['diag','spiral'],ratio:'3:4',guide:'sit',focal:'35mm',fx:.62,fy:.5,
+  tip:'单膝抬起，头、膝、臀连成稳定三角，栈桥斜线引导视线。',
+  ops:[{t:'spiral',flip:'',c:'w',op:.45},{t:'poly',pts:[[.62,.2],[.47,.64],[.8,.8]],c:'y',l:'头 · 膝 · 臀 三角'},{t:'curve',pts:[[.38,1],[.47,.86],[.55,.73]],c:'g',l:'栈桥斜线'}]},
+ {k:'city',title:'城市栈桥 · 剪影',sc:'city',pr:'full',prt:'剪影 · 人占 ≈ 1/5',cp:['lead'],ratio:'9:16',guide:'sroad',focal:'35mm',fx:.47,fy:.6,
+  tip:'栈桥斜线指向人物，剪影手脚与身体分开，轮廓更清楚。',
+  ops:[{t:'h',y:.63,c:'y',l:'天际线 · 下三分附近'},{t:'curve',pts:[[.28,1],[.37,.86],[.46,.73]],c:'w',l:'栈桥引导线'},{t:'box',x:.452,y:.53,w:.05,h:.19,c:'g',l:'剪影 · 手脚分离'}]},
+ {k:'neonman',title:'霓虹灯管 · 对称框架',sc:'night',pr:'half',prt:'背影半身',cp:['sym','frame'],ratio:'16:9',guide:'sym',focal:'35mm',fx:.5,fy:.5,
+  tip:'人站正中，两侧灯管左右对称成框；头顶正上方那根灯管要避开。',
+  ops:[{t:'v',x:.5,c:'y',l:'中轴对称',dash:1},{t:'box',x:.465,y:0,w:.05,h:.12,c:'r',l:'✗ 灯管正对头顶'},{t:'v',x:.08,c:'w',dash:1},{t:'v',x:.92,c:'w',dash:1},{t:'pt',x:.15,y:.8,c:'w',l:'灯管成框'}]},
+ {k:'fairy',title:'夜海灯串 · 黄金螺旋',sc:'night',pr:'full',prt:'人占画高 ≈ 1/2',cp:['spiral','lead','horizon'],ratio:'16:9',guide:'spiral',focal:'35mm',fx:.62,fy:.5,
+  tip:'头部落在螺旋眼，灯串在沙滩上画出引导曲线。',
+  ops:[{t:'spiral',flip:'y',c:'y',op:.85},{t:'curve',pts:[[.63,.3],[.62,.55],[.67,.74],[.78,.8],[.6,.83],[.36,.84]],c:'g',l:'灯串引导线'},{t:'h',y:.47,c:'o',l:'海平线过腰 · 可再蹲低'}]},
+ {k:'girl',title:'白墙半身肖像',sc:'studio',pr:'half',prt:'胸下半身',cp:['cut','thirds'],ratio:'4:5',guide:'thirds',focal:'85mm',fx:.5,fy:.45,
+  tip:'头顶留一拳，下巴不贴边，切在胸腔下沿。',
+  ops:[{t:'h',y:.17,c:'g',l:'✓ 头顶留白'},{t:'h',y:.385,c:'y',l:'眼睛 ≈ 上三分线',dash:1},{t:'h',y:.505,c:'r',l:'✗ 下巴 / 喉结 禁切'},{t:'h',y:.70,c:'g',l:'✓ 胸腔下沿 推荐切'}]},
+ {k:'redsweater',title:'暖色棚拍 · 转身回眸',sc:'studio',pr:'half',prt:'腰上半身',cp:['thirds'],ratio:'4:5',guide:'thirds',focal:'85mm',fx:.45,fy:.45,
+  tip:'身体侧转、脸回看镜头，眼睛靠近左上交点，红衣占据右下。',
+  ops:[{t:'thirds'},{t:'pt',x:.4,y:.25,c:'y',l:'眼睛 · 左上交点'},{t:'h',y:.17,c:'g',l:'✓ 头顶一拳'}]},
+ {k:'studiocolor',title:'撞色棚拍 · 叉腰七分',sc:'studio',pr:'cowboy',prt:'切大腿上段',cp:['sym','cut'],ratio:'4:5',guide:'cowboy',focal:'50mm',fx:.5,fy:.5,
+  tip:'人物居中，叉腰让手臂和身体之间留出三角空隙，显瘦又有姿态。',
+  ops:[{t:'h',y:.1,c:'g',l:'✓ 头顶留白'},{t:'poly',pts:[[.78,.37],[.94,.5],[.84,.6]],c:'y',l:''},{t:'pt',x:.84,y:.68,c:'y',l:'叉腰三角空隙'},{t:'h',y:.985,c:'g',l:'✓ 底边切大腿'}]},
+ {k:'cafe',title:'咖啡馆窗边 · 半身',sc:'studio',pr:'half',prt:'胸下半身',cp:['thirds'],ratio:'4:5',guide:'thirds',focal:'50mm',fx:.34,fy:.45,
+  tip:'眼睛靠近左上交点，右侧留出视线空间，灯珠虚化作背景。',
+  ops:[{t:'thirds'},{t:'pt',x:.31,y:.36,c:'y',l:'眼睛 · 左上交点'},{t:'pt',x:.78,y:.14,c:'w',l:'灯珠虚化'}]}
+ ,{k:'couple',title:'田间小路 · 情侣背影',sc:'mount',pr:'tiny',prt:'两人占画高 ≈ 1/8',cp:['lead','sym'],ratio:'4:5',guide:'vp',focal:'35mm',fx:.48,fy:.55,
+  tip:'土路从底部两侧汇向两人，云层占上半画面，牵手往远处走。',
+  ops:[{t:'line',a:[.22,1],b:[.48,.62],c:'y'},{t:'line',a:[.78,1],b:[.5,.62],c:'y'},{t:'box',x:.46,y:.5,w:.065,h:.13,c:'g',l:'牵手背影 ≈ 1/8'},{t:'rect',x:0,y:0,w:1,h:.42,c:'w',l:'云层留白'}]}
+ ,{k:'lakeman',title:'湖上栈桥 · 中轴对称',sc:'lake',pr:'tiny',prt:'人占画高 ≈ 1/7',cp:['sym','lead'],ratio:'4:5',guide:'sym',focal:'24mm',fx:.5,fy:.5,
+  tip:'人站在栈桥尽头的中轴线上，两排木桩左右对称，木板纹路指向人物。',
+  ops:[{t:'v',x:.5,c:'y',l:'中轴对称',dash:1},{t:'line',a:[.1,1],b:[.5,.55],c:'y'},{t:'line',a:[.9,1],b:[.5,.55],c:'y'},{t:'box',x:.475,y:.38,w:.05,h:.16,c:'g',l:'人站栈桥尽头'}]}
+ ,{k:'rooftop',title:'天台远眺 · 城市大景小人',sc:'city',pr:'tiny',prt:'人占画高 ≈ 1/6',cp:['thirds','diag'],ratio:'16:9',guide:'small',focal:'35mm',fx:.62,fy:.5,
+  tip:'人站在右三分线的天台边缘，天台斜线把视线送过去，城市雾气做背景。',
+  ops:[{t:'v',x:.667,c:'y',dash:1},{t:'box',x:.7,y:.46,w:.055,h:.2,c:'g',l:'人物 · 右三分'},{t:'line',a:[.42,1],b:[.98,.66],c:'w'},{t:'h',y:.5,c:'w',l:'天际线',dash:1}]}
+ ,{k:'mountainman',title:'岩石之巅 · 视线留白',sc:'mount',pr:'full',prt:'人占画高 ≈ 1/3',cp:['thirds','space'],ratio:'16:9',guide:'thirds',focal:'35mm',fx:.4,fy:.45,
+  tip:'人站在左三分线，面朝右侧，大片天空留给视线方向；红色外套跳出蓝天。',
+  ops:[{t:'v',x:.333,c:'y',l:'人物落左三分',dash:1},{t:'rect',x:.45,y:.04,w:.53,h:.6,c:'w',l:'视线方向留白'},{t:'box',x:.22,y:.26,w:.1,h:.4,c:'g'},{t:'h',y:.66,c:'w',l:'岩石边缘',dash:1}]}
+ ,{k:'alone',title:'山顶张开双臂 · 全身中心',sc:'mount',pr:'full',prt:'人占画高 ≈ 3/4',cp:['sym','horizon'],ratio:'4:5',guide:'full',focal:'24mm',fx:.5,fy:.45,
+  tip:'人站中轴、双臂张开，脚在画内；远山线压在胸口，蹲低拍能让人更高大。',
+  ops:[{t:'v',x:.5,c:'y',l:'中轴',dash:1},{t:'h',y:.3,c:'o',l:'远山线在胸口 · 可蹲低'},{t:'h',y:.8,c:'g',l:'✓ 双脚完整入画'}]}
+ ,{k:'daylight',title:'雪山前坐姿 · 三层景深',sc:'mount',pr:'full',prt:'坐姿 · 人占 ≈ 1/4',cp:['thirds','layers'],ratio:'16:9',guide:'sit',focal:'50mm',fx:.4,fy:.5,
+  tip:'人坐在左三分线的岩石上，抱膝形成三角；雪山、森林、岩石三层叠加。',
+  ops:[{t:'bands',b:[[0,.32,'背景 · 雪山'],[.32,.6,'中景 · 森林'],[.6,1,'前景 · 岩石与人']]},{t:'poly',pts:[[.37,.44],[.45,.55],[.32,.62]],c:'y',l:''},{t:'pt',x:.46,y:.5,c:'y',l:'抱膝三角'}]}
+ ,{k:'peace',title:'白崖长椅 · 背影三段式',sc:'sea',pr:'half',prt:'背影 · 人占 ≈ 2/5',cp:['layers','sym'],ratio:'16:9',guide:'layers',focal:'35mm',fx:.5,fy:.5,
+  tip:'人坐长椅正中，双臂搭在椅背上展开；白崖、海面、草地人物三层分明。',
+  ops:[{t:'bands',b:[[0,.22,'背景 · 白崖'],[.22,.5,'中景 · 海面'],[.5,1,'前景 · 长椅与人']]},{t:'v',x:.5,c:'w',dash:1}]}
+ ,{k:'creator',title:'山野笑脸 · 环境特写',sc:'mount',pr:'close',prt:'脸占画高 ≈ 2/5',cp:['thirds','cut'],ratio:'4:5',guide:'thirds',focal:'85mm',fx:.5,fy:.4,
+  tip:'眼睛压上三分线，长焦把远山虚化成背景，底边切在胸口而不是下巴。',
+  ops:[{t:'h',y:.1,c:'g',l:'✓ 头顶留白'},{t:'h',y:.333,c:'y',l:'眼睛 · 上三分线',dash:1},{t:'h',y:.53,c:'r',l:'✗ 别切下巴',dash:1},{t:'pt',x:.1,y:.4,c:'w',l:'远山虚化'},{t:'h',y:.97,c:'g',l:'✓ 胸口下切'}]}
+ ,{k:'curly',title:'双臂抱头 · 肢体成框',sc:'studio',pr:'half',prt:'腰上半身',cp:['frame','sym'],ratio:'4:5',guide:'frame',focal:'50mm',fx:.5,fy:.45,
+  tip:'双手放在头顶，两条手臂围成一个框，把视线锁在脸上；纯色墙最干净。',
+  ops:[{t:'poly',pts:[[.12,.42],[.3,.12],[.5,.06],[.7,.12],[.88,.42]],open:1,c:'y'},{t:'pt',x:.72,y:.22,c:'y',l:'手臂围成框'},{t:'v',x:.5,c:'w',dash:1},{t:'h',y:.04,c:'g',l:'✓ 头顶留白'}]}
+ ,{k:'reader',title:'暗室读书 · 侧光与留白',sc:'studio',pr:'half',prt:'坐姿半身',cp:['space','thirds'],ratio:'4:5',guide:'space',focal:'50mm',fx:.55,fy:.45,
+  tip:'侧窗光只照亮脸和书，左侧大片暗部留白，低头看书比看镜头更有故事。',
+  ops:[{t:'rect',x:0,y:0,w:.3,h:1,c:'w',l:'暗部留白'},{t:'pt',x:.55,y:.22,c:'y',l:'视线向下 · 看书'},{t:'pt',x:.85,y:.12,c:'g',l:'侧窗光'}]}
+ ,{k:'nya',title:'咖啡馆窗格 · 坐姿半身',sc:'studio',pr:'half',prt:'坐姿 · 桌上半身',cp:['frame','thirds'],ratio:'4:5',guide:'sit',focal:'35mm',fx:.5,fy:.5,
+  tip:'人坐在窗格前，双手交握放在桌上，视线看向窗外；咖啡杯入镜点题。',
+  ops:[{t:'box',x:.02,y:0,w:.3,h:.55,c:'w',l:''},{t:'pt',x:.17,y:.58,c:'w',l:'窗格做背景'},{t:'pt',x:.52,y:.4,c:'y',l:'视线看向窗外'},{t:'pt',x:.42,y:.92,c:'g',l:'咖啡杯点题'}]}
+];
+const SUBCATS=[['all','全部'],['nature','自然风光'],['still','室内静物'],['urban','城市建筑']];
+const SUBJECTS=[
+ {k:'tree',cat:'nature',name:'树林',title:'森林光束 · 逆光树干',ratio:'4:5',guide:'sym',focal:'35mm',fx:.5,fy:.45,
+  ops:[{t:'v',x:.2,c:'w',dash:1},{t:'v',x:.35,c:'w',dash:1},{t:'v',x:.65,c:'w',dash:1},{t:'v',x:.8,c:'w',dash:1},{t:'line',a:[.5,.28],b:[.28,1],c:'y'},{t:'line',a:[.5,.28],b:[.72,1],c:'y'},{t:'pt',x:.5,y:.28,c:'y',l:'太阳藏在树干后'},{t:'h',y:.92,c:'g',l:'✓ 相机端平，树干不歪'}],
+  angle:['平视或微仰，镜头朝向太阳方向','把太阳藏在树干边缘，只露一半，容易出星芒'],
+  comp:['树干竖线重复出现，就是节奏感','太阳放中轴或三分线，地面留 1/5 交代落脚点'],
+  light:['清晨或傍晚，起雾时最容易出丁达尔光束','对着亮部测光，暗部压黑，光束更清楚'],
+  person:['人站进光束里背对镜头，人景比 1:9','别让人刚好站在两棵树干重叠的位置'],
+  verse:'树干要竖直，太阳躲树后，人站光里走'},
+ {k:'palmroad',cat:'nature',name:'单棵树',title:'椰树剪影 · 公路 S 线',ratio:'4:5',guide:'sroad',focal:'35mm',fx:.5,fy:.5,
+  ops:[{t:'curve',pts:[[.42,1],[.55,.86],[.48,.74],[.58,.62]],c:'y',l:'公路 S 线'},{t:'pt',x:.5,y:.4,c:'w',l:'逆光剪影'},{t:'h',y:.53,c:'w',l:'海平线',dash:1}],
+  angle:['蹲低机位逆光拍，树变成干净的剪影','树冠放在天空最亮的位置'],
+  comp:['一棵树就是主体，四周大面积留白','有路就让路从底部弯进来，指向树'],
+  light:['日落前后 20 分钟，天空有渐变色','对天空测光，树和地面压成黑色轮廓'],
+  person:['人站在树下或靠着树干，只占树高的 1/3','剪影时手脚和树干分开，别粘在一起'],
+  verse:'一树一天空，逆光出轮廓，路弯指向它'},
+ {k:'flower',cat:'nature',name:'植物叶片',title:'叶脉对角线 · 局部特写',ratio:'4:5',guide:'diag',focal:'50mm 微距',fx:.5,fy:.5,
+  ops:[{t:'line',a:[0,1],b:[1,0],c:'y'},{t:'pt',x:.5,y:.5,c:'y',l:'叶脉对角线'},{t:'line',a:[0,.55],b:[.55,0],c:'w'},{t:'line',a:[.45,1],b:[1,.45],c:'w'}],
+  angle:['靠近到只拍局部，别拍整株','镜头和叶面平行，纹理才清楚'],
+  comp:['让叶脉或枝条斜着穿过画面','重复的线条铺满画面，不留杂物'],
+  light:['阴天散射光最显绿色的细腻层次','侧逆光能透出叶片的脉络'],
+  person:['手指轻托叶片入镜，指甲干净','人藏在叶片后只露一只眼，做前景遮挡'],
+  verse:'凑近拍局部，叶脉斜着走，侧光透出绿'},
+ {k:'sky',cat:'nature',name:'晚霞天空',title:'晚霞海面 · 天空占 2/3',ratio:'16:9',guide:'thirds',focal:'24mm',fx:.5,fy:.5,
+  ops:[{t:'h',y:.5,c:'o',l:'地平线居中 · 略显平淡'},{t:'h',y:.667,c:'g',l:'✓ 下移到下三分，天空占 2/3'},{t:'pt',x:.55,y:.43,c:'y',l:'最亮的云'}],
+  angle:['平视，相机一定要端平','用广角把云层的延伸感拍出来'],
+  comp:['天空好看就让天空占 2/3，地平线放下三分','地面留一点礁石或树影做前景'],
+  light:['日落后 10–20 分钟云最红，别急着走','曝光往下压 0.7–1EV，颜色更浓'],
+  person:['人做剪影站在下三分线上，人景比 1:9','举手、跳跃等大动作在剪影里最好看'],
+  verse:'天美占三分之二，地平端平别倾斜'},
+ {k:'mirror',cat:'nature',name:'水面倒影',title:'湖面倒影 · 上下对称',ratio:'4:5',guide:'sym',focal:'35mm',fx:.72,fy:.6,
+  ops:[{t:'h',y:.63,c:'y',l:'水岸线 · 倒影对称轴'},{t:'v',x:.667,c:'w',dash:1},{t:'pt',x:.77,y:.42,c:'g',l:'主体落右三分'}],
+  angle:['镜头尽量贴近水面，倒影更完整','无风的清晨水面最平'],
+  comp:['水岸线放正中做上下对称','主体放左右三分线，避免死板'],
+  light:['顺光时倒影颜色最饱和','有风时用慢门把水面拍平'],
+  person:['人站在岸边，倒影里也要能看到完整的人','雨后的水洼也能拍出同样效果'],
+  verse:'贴水拍倒影，岸线放中间，无风最平静'},
+ {k:'chair',cat:'still',name:'椅子',title:'单椅 · 留白与呼应',ratio:'4:5',guide:'thirds',focal:'35mm',fx:.55,fy:.6,
+  ops:[{t:'thirds'},{t:'box',x:.42,y:.5,w:.22,h:.4,c:'g',l:'椅子 · 下三分'},{t:'pt',x:.53,y:.2,c:'w',l:'挂画呼应'},{t:'rect',x:0,y:0,w:.38,h:.5,c:'w',l:'大面积留白'}],
+  angle:['从斜前方 45° 拍，椅子才有立体感，正面拍会很扁','镜头高度和椅面持平，或略高一点'],
+  comp:['椅子放下三分交点，墙面留白','用墙上的画、落地灯、绿植做呼应'],
+  light:['侧窗光最好，让椅子有一侧阴影','避开顶灯直射，椅面会发灰'],
+  person:['侧坐、反坐或单腿盘在椅子上','人和椅子一起占画面 1/2，留出墙面'],
+  verse:'椅子斜四五，镜头齐椅面，墙面留空白'},
+ {k:'coffee',cat:'still',name:'咖啡（平视）',title:'咖啡杯 · 背景虚化',ratio:'4:5',guide:'thirds',focal:'50mm',fx:.47,fy:.6,
+  ops:[{t:'rect',x:0,y:0,w:1,h:.55,c:'w',l:'背景灯光虚化成光斑'},{t:'h',y:.667,c:'y',l:'',dash:1},{t:'pt',x:.47,y:.77,c:'y',l:'杯子 · 下三分'}],
+  angle:['45° 斜拍，杯型和拉花都看得到','手机靠近杯子，开人像模式或大光圈'],
+  comp:['杯子放下三分线，上方留给虚化的环境','杯柄朝右下 4 点钟方向最顺眼'],
+  light:['靠窗座位，侧光让杯子有高光','背景有灯串、吊灯时虚化成光斑'],
+  person:['手扶杯柄或托着杯底入镜','人在背景里虚化，只留一个模糊轮廓'],
+  verse:'杯柄四点钟，斜拍四十五，背景灯成珠'},
+ {k:'coffee2',cat:'still',name:'咖啡（俯拍）',title:'正俯拍 · 中心构图',ratio:'1:1',guide:'sym',focal:'26mm',fx:.5,fy:.47,
+  ops:[{t:'v',x:.5,c:'w',dash:1},{t:'h',y:.47,c:'w',dash:1},{t:'ell',x:.5,y:.47,rx:.2,ry:.3,c:'y',l:'杯口是正圆 = 正俯拍'},{t:'pt',x:.85,y:.18,c:'w',l:'纹理桌面留白'}],
+  angle:['手机和桌面平行，打开水平仪对准十字','站起来从正上方拍，杯口要是正圆'],
+  comp:['杯子放正中，四周留白','或放在对角线一端，另一端放勺子、书'],
+  light:['窗边自然光，避免手机挡出影子','白色或大理石桌面最干净'],
+  person:['一只手从画面边缘伸进来拿杯子','手和杯子保持一个拳头的距离'],
+  verse:'手机平桌面，杯口拍正圆，四周留空白'},
+ {k:'food',cat:'still',name:'美食',title:'甜点特写 · 只拍局部',ratio:'4:5',guide:'diag',focal:'50mm 微距',fx:.4,fy:.4,
+  ops:[{t:'pt',x:.32,y:.3,c:'y',l:'焦点：最诱人的局部'},{t:'curve',pts:[[.55,1],[.62,.75],[.82,.5]],c:'w',l:'叉子引导线'}],
+  angle:['平铺的菜正俯拍，有高度的甜点 45° 拍','凑近只拍最诱人的那一块'],
+  comp:['餐具斜放形成引导线','主体放三分交点，另一角放饮品或花'],
+  light:['侧逆光让糖霜、油光发亮','别开闪光灯，食物会发灰'],
+  person:['叉子正在切、手正在撕，动作让人有食欲','只拍手，不拍脸，画面更干净'],
+  verse:'侧逆光发亮，叉子斜着放，凑近拍一口'},
+ {k:'flatlay',cat:'still',name:'桌面平铺',title:'旅行物件 · 四角散点',ratio:'4:5',guide:'frame',focal:'26mm',fx:.5,fy:.5,
+  ops:[{t:'rect',x:.3,y:.3,w:.4,h:.38,c:'w',l:'中间留白'},{t:'box',x:.12,y:.04,w:.14,h:.3,c:'g'},{t:'box',x:.52,y:0,w:.46,h:.32,c:'g'},{t:'box',x:0,y:.55,w:.3,h:.45,c:'g'},{t:'box',x:.72,y:.62,w:.28,h:.38,c:'g',l:'物件沿四角散开'}],
+  angle:['90° 正俯拍，手机与桌面平行','站在椅子上拍，避免透视变形'],
+  comp:['物件按大、中、小错落，数量取单数','物件沿边缘摆，中间留白放文字或手'],
+  light:['大窗散射光，阴影柔和','统一色调：同一种颜色重复出现'],
+  person:['手正在写字、翻地图、拿相机','手只伸进一半，别把手臂拍全'],
+  verse:'俯拍要平行，物件取单数，四角放中间空'},
+ {k:'lights',cat:'still',name:'氛围小物',title:'灯串与书 · 前景光斑',ratio:'4:5',guide:'thirds',focal:'50mm',fx:.5,fy:.55,
+  ops:[{t:'thirds'},{t:'pt',x:.55,y:.62,c:'y',l:'书本 · 主体'},{t:'pt',x:.2,y:.15,c:'w',l:'前景灯珠虚化'}],
+  angle:['降低机位，镜头贴近桌面','让灯串离镜头更近，出光斑'],
+  comp:['主体放下三分线，上方留给光斑','灯串绕成弧线，引向主体'],
+  light:['关掉大灯，只留暖色小灯','曝光往下压，光斑更圆更亮'],
+  person:['手捧灯串或书，只拍手和下巴','脸靠近灯串，暖光打在脸上'],
+  verse:'关大灯留小灯，镜头贴桌面，光斑放前面'},
+ {k:'arch',cat:'urban',name:'建筑',title:'金字塔夜景 · 中轴对称',ratio:'16:9',guide:'sym',focal:'24mm',fx:.5,fy:.55,
+  ops:[{t:'v',x:.5,c:'y',l:'中轴对称',dash:1},{t:'pt',x:.5,y:.43,c:'g',l:'塔尖 = 视觉中心'},{t:'h',y:.76,c:'w',l:'地面线 · 保持水平',dash:1}],
+  angle:['站在建筑正中轴线上拍','手机竖直不要仰，避免楼往后倒'],
+  comp:['对称建筑就大胆居中','广角把两侧的结构一起收进来'],
+  light:['蓝调时刻（日落后 20 分钟）灯和天一样亮','雨后地面有倒影，再加一层对称'],
+  person:['人站在中轴线上，大景小人','人往前走的背影，比正面站桩更有故事'],
+  verse:'站中轴拍对称，手机竖直别仰头'},
+ {k:'arch2',cat:'urban',name:'街巷 / 运河',title:'运河窄巷 · 消失点与框架',ratio:'4:5',guide:'vp',focal:'24mm',fx:.5,fy:.5,
+  ops:[{t:'line',a:[0,0],b:[.47,.56],c:'y'},{t:'line',a:[1,.05],b:[.47,.56],c:'y'},{t:'line',a:[.25,1],b:[.47,.6],c:'y'},{t:'line',a:[.78,1],b:[.47,.6],c:'y'},{t:'box',x:.33,y:.3,w:.27,h:.16,c:'w',l:'桥洞成框'},{t:'pt',x:.47,y:.58,c:'g',l:'消失点'}],
+  angle:['站在巷子或水道的正中','手机略高于腰，地面和两侧墙都拍进来'],
+  comp:['两侧墙线汇向一个消失点','远处的桥洞、拱门形成画中画'],
+  light:['阴天或傍晚，巷子两侧明暗均匀','巷子尽头亮、两侧暗时层次最好'],
+  person:['人站在消失点附近，或从巷子尽头走来','穿亮色衣服，在灰墙里跳出来'],
+  verse:'站在巷中间，墙线汇一点，人往尽头走'},
+ {k:'street',cat:'urban',name:'彩色街区',title:'彩色房子 · 夕阳汇聚',ratio:'9:16',guide:'vp',focal:'24mm',fx:.57,fy:.5,
+  ops:[{t:'line',a:[0,.05],b:[.57,.52],c:'y'},{t:'line',a:[1,.05],b:[.57,.52],c:'y'},{t:'line',a:[.4,1],b:[.57,.56],c:'y'},{t:'line',a:[.88,1],b:[.57,.56],c:'y'},{t:'pt',x:.57,y:.52,c:'g',l:'消失点 · 夕阳'}],
+  angle:['竖幅拍，把两侧房子的高度拍出来','镜头放在水面或路面高度'],
+  comp:['水道或街道从底部中间伸向远处','夕阳刚好落在消失点上'],
+  light:['逆光时房子颜色会暗，侧光最饱和','日落前半小时，墙面暖色更明显'],
+  person:['人站在岸边一侧，不挡住消失点','坐在台阶上，腿朝向画面内'],
+  verse:'竖幅拍街巷，夕阳放尽头，人站在一侧'},
+ {k:'car',cat:'urban',name:'汽车',title:'复古小车 · 低机位侧拍',ratio:'16:9',guide:'thirds',focal:'35mm',fx:.5,fy:.55,
+  ops:[{t:'box',x:.08,y:.33,w:.84,h:.52,c:'g',l:''},{t:'pt',x:.5,y:.28,c:'g',l:'车身完整 · 不切车轮'},{t:'h',y:.86,c:'w',l:'地面线',dash:1},{t:'pt',x:.9,y:.6,c:'y',l:'车头朝向'}],
+  angle:['镜头放到车灯高度，车型更饱满','经典角度是前侧 45°，同时看到车头和车身'],
+  comp:['车头朝向那一侧多留空间','车轮完整入画，不切轮子'],
+  light:['阴天拍车漆最均匀，晴天注意反光','背景选纯色墙，和车色撞色'],
+  person:['人倚在车门边，或坐在引擎盖上','人和车的颜色呼应，比如黄车配白衣'],
+  verse:'车灯高度拍，车头留空间，轮子别切掉'},
+ {k:'flowers',cat:'nature',name:'花枝',title:'花枝仰拍 · 蓝天做背景',ratio:'4:5',guide:'diag',focal:'50mm',fx:.5,fy:.4,
+  ops:[{t:'line',a:[.95,.95],b:[.18,.08],c:'y'},{t:'pt',x:.5,y:.27,c:'y',l:'最大的花簇 = 焦点'},{t:'rect',x:0,y:0,w:.3,h:.45,c:'w',l:'蓝天留白'}],
+  angle:['蹲下仰拍，让干净的蓝天做背景','镜头贴近最前面的花，后面的自然虚化'],
+  comp:['花枝从画面一角斜着伸进来','选一簇最大的花放在三分点上'],
+  light:['晴天上午，顺光时蓝天最蓝','逆光拍花瓣会透光，记得压暗曝光'],
+  person:['人站在树下仰头，花枝做前景遮挡','手轻托一枝花凑近脸，只拍半张脸'],
+  verse:'蹲下往上拍，天蓝花更亮，枝条斜着长'}
+ ,{k:'citynight',cat:'urban',name:'城市夜景',title:'雨夜街道 · 光斑与反光',ratio:'4:5',guide:'sroad',focal:'50mm',fx:.5,fy:.55,
+  ops:[{t:'curve',pts:[[.5,1],[.52,.78],[.5,.6],[.5,.48]],c:'y',l:'路面反光引导线'},{t:'rect',x:0,y:0,w:1,h:.4,c:'w',l:'远处灯光虚化成光斑'}],
+  angle:['镜头贴近地面，路面反光会变成长条','大光圈或人像模式，远处路灯虚化成圆斑'],
+  comp:['反光从画面底部中间延伸向远处','上方留给光斑，画面暗部压黑'],
+  light:['雨后或洒水后地面最亮','蓝调时刻比全黑更有层次'],
+  person:['人站在反光线的尽头，打伞或回头','人离镜头 3–5m，背景光斑才够大'],
+  verse:'雨后贴地拍，反光当引路，灯珠虚成圆'}
+];
+/* guide -> matched sample photos. a: image point, t: frame point, z: zoom; f:[x,top,bottom] person in image, t:[u,top,bottom] person in frame */
+const GP={
+ thirds:[{k:'beach',r:'4:5',a:[.6,.29],t:[.667,.333]},{k:'creator',r:'4:5',a:[.58,.3],t:[.667,.333],z:1.3},{k:'mountainman',r:'16:9',a:[.27,.33],t:[.333,.333]},{k:'cafe',r:'4:5',a:[.31,.36],t:[.333,.333]},{k:'redsweater',r:'4:5',a:[.4,.25],t:[.333,.333]},{k:'hiker',r:'16:9',a:[.31,.5],t:[.333,.5]},{k:'chair',r:'4:5',a:[.53,.7],t:[.667,.667],z:1.15},{k:'lights',r:'4:5',a:[.55,.62],t:[.667,.667]}],
+ small:[{k:'snow',r:'16:9',a:[.4,.515],t:[.667,.64]},{k:'rooftop',r:'16:9',a:[.72,.56],t:[.667,.64]},{k:'cliff',r:'16:9',a:[.6,.46],t:[.667,.64]},{k:'couple',r:'16:9',a:[.49,.57],t:[.667,.64],z:1.2},{k:'lakeman',r:'16:9',a:[.5,.47],t:[.667,.64],z:1.2},{k:'reflect',r:'16:9',a:[.67,.45],t:[.667,.64]},{k:'sky',r:'16:9',a:[.55,.5],t:[.5,.667]}],
+ horizon:[{k:'sea',r:'4:5',a:[.5,.47],t:[.5,.2225],z:2},{k:'fairy',r:'16:9',a:[.68,.2],t:[.5,.1],z:1.2},{k:'alone',r:'4:5',a:[.5,.07],t:[.5,.1],z:1.1}],
+ sroad:[{k:'sroad',r:'9:16',a:[.5,.62],t:[.6,.53]},{k:'city',r:'9:16',a:[.47,.72],t:[.6,.53]},{k:'citynight',r:'9:16',a:[.5,.6],t:[.5,.55]},{k:'palmroad',r:'9:16',a:[.5,.72],t:[.5,.65]},{k:'couple',r:'9:16',a:[.49,.6],t:[.6,.53]}],
+ vp:[{k:'lakeman',r:'4:5',a:[.5,.52],t:[.5,.42]},{k:'couple',r:'4:5',a:[.49,.6],t:[.5,.42]},{k:'arch2',r:'4:5',a:[.47,.58],t:[.5,.42]},{k:'street',r:'9:16',a:[.57,.53],t:[.5,.42]}],
+ diag:[{k:'palm',r:'16:9',a:[.4,.48],t:[.5,.5]},{k:'flowers',r:'4:5',a:[.55,.5],t:[.5,.5]},{k:'rooftop',r:'16:9',a:[.7,.75],t:[.5,.5],z:1.2},{k:'flower',r:'4:5',a:[.5,.5],t:[.5,.5]},{k:'cliff',r:'16:9',a:[.7,.5],t:[.5,.5]},{k:'food',r:'4:5',a:[.45,.45],t:[.5,.5]}],
+ sym:[{k:'lakeman',r:'4:5',a:[.5,.5],t:[.5,.5]},{k:'neonman',r:'16:9',a:[.5,.5],t:[.5,.5]},{k:'alone',r:'4:5',a:[.5,.45],t:[.5,.5]},{k:'arch',r:'16:9',a:[.5,.6],t:[.5,.5]},{k:'reflect',r:'16:9',a:[.5,.5],t:[.5,.5]},{k:'coffee2',r:'1:1',a:[.5,.47],t:[.5,.5]},{k:'mirror',r:'4:5',a:[.62,.63],t:[.5,.5]},{k:'tree',r:'4:5',a:[.5,.5],t:[.5,.5]}],
+ frame:[{k:'curly',r:'4:5',a:[.5,.35],t:[.5,.45]},{k:'canyon',r:'4:5',a:[.45,.5],t:[.5,.5]},{k:'nya',r:'4:5',a:[.45,.5],t:[.5,.5]},{k:'arch2',r:'4:5',a:[.47,.5],t:[.5,.5]},{k:'flatlay',r:'4:5',a:[.5,.5],t:[.5,.5]}],
+ space:[{k:'reader',r:'4:5',a:[.55,.4],t:[.72,.45],z:1.15},{k:'cliff',r:'16:9',a:[.6,.46],t:[.78,.62],z:1.3},{k:'chair',r:'4:5',a:[.53,.7],t:[.75,.7],z:1.25},{k:'coffee',r:'4:5',a:[.47,.75],t:[.7,.75],z:1.25}],
+ layers:[{k:'peace',r:'16:9',a:[.5,.5],t:[.5,.5]},{k:'daylight',r:'16:9',a:[.45,.5],t:[.5,.5]},{k:'friends',r:'16:9',a:[.5,.5],t:[.5,.5]},{k:'citynight',r:'4:5',a:[.5,.5],t:[.5,.5]}],
+ cowboy:[{k:'studiocolor',r:'4:5',f:[.5,.1,1],t:[.5,.1,1]}],
+ full:[{k:'summit',r:'4:5',f:[.5,.36,.93],t:[.5,.1,.96]},{k:'mountainman',r:'3:4',f:[.27,.27,.66],t:[.5,.1,.96]},{k:'hiker',r:'4:5',f:[.3,.22,.82],t:[.5,.1,.96]}],
+ spiral:[{k:'fairy',r:'16:9',a:[.5,.5],t:[.5,.5],fl:'y'},{k:'pier',r:'16:9',a:[.5,.5],t:[.5,.5],fl:''},{k:'cafe',r:'16:9',a:[.5,.5],t:[.5,.5],fl:'xy'}],
+ sit:[{k:'pier',r:'3:4',a:[.62,.5],t:[.5,.5]},{k:'daylight',r:'4:5',a:[.39,.53],t:[.5,.5],z:1.6}],
+ cut:[{k:'summit',r:'3:4',f:[.5,.36,.93],t:[.4,.1,.94]},{k:'mountainman',r:'3:4',f:[.27,.27,.66],t:[.4,.1,.94]},{k:'hiker',r:'3:4',f:[.3,.22,.82],t:[.4,.1,.94]}],
+ none:[]
+};
+const PMAP=Object.fromEntries(PHOTOS.map(p=>[p.k,p]));
+const SMAP=Object.fromEntries(SUBJECTS.map(p=>[p.k,p]));
+const ALLP={...PMAP,...SMAP};
+const ALLKEYS=[...PHOTOS,...SUBJECTS].map(p=>p.k);
+
+/* ---------- SVG helpers ---------- */
+const ln=(x1,y1,x2,y2,c,w=1.4,dash='',op=1)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" ${dash?`stroke-dasharray="${dash}"`:''} opacity="${op}"/>`;
+const tx=(x,y,t,c,fs=11,anchor='start',weight=600)=>`<text x="${x}" y="${y}" fill="${c}" font-size="${fs}" font-weight="${weight}" text-anchor="${anchor}">${esc(t)}</text>`;
+function smooth(p){let d=`M${p[0][0]},${p[0][1]}`;for(let i=0;i<p.length-1;i++){const p0=p[i-1]||p[i],p1=p[i],p2=p[i+1],p3=p[i+2]||p2;d+=` C${p1[0]+(p2[0]-p0[0])/6},${p1[1]+(p2[1]-p0[1])/6} ${p2[0]-(p3[0]-p1[0])/6},${p2[1]-(p3[1]-p1[1])/6} ${p2[0]},${p2[1]}`}return d}
+const FIG_L=[[-.022,.118],[-.06,.15],[-.112,.172],[-.128,.21],[-.135,.32],[-.128,.45],[-.118,.5],[-.112,.535],[-.096,.54],[-.094,.5],[-.098,.45],[-.1,.33],[-.086,.26],[-.072,.33],[-.066,.39],[-.088,.47],[-.084,.56],[-.072,.66],[-.06,.72],[-.062,.82],[-.042,.94],[-.07,.985],[-.065,1],[-.016,1],[-.014,.94],[-.022,.82],[-.024,.72],[-.014,.6],[0,.515]];
+function fig(cx,top,h,c='rgba(255,255,255,.75)',fill='rgba(255,255,255,.08)',dash='4 3'){
+  const L=FIG_L.map(([x,y])=>[cx+x*h,top+y*h]);
+  const R=FIG_L.slice(0,-1).reverse().map(([x,y])=>[cx-x*h,top+y*h]);
+  const d='M'+[...L,...R].map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L')+' Z';
+  return `<g class="figg" stroke="${c}" stroke-width="1.3" fill="${fill}" stroke-dasharray="${dash}" stroke-linejoin="round"><ellipse cx="${cx}" cy="${top+.06*h}" rx="${.052*h}" ry="${.062*h}"/><path d="${d}"/></g>`;
+}
+function spiral(W,H,flip='',c=C.y,op=.9,sw=1.6){
+  const land=W>=H;let x=0,y=0,w=land?PHI:1,h=land?1:PHI;const sx=W/(land?PHI:1),sy=H/(land?1:PHI);
+  const order=land?['L','T','R','B']:['T','R','B','L'];let d='',grid='';
+  for(let i=0;i<11;i++){const dir=order[i%4];let s,a,b;
+    if(dir==='L'){s=h;a=[x,y+s];b=[x+s,y];grid+=ln((x+s)*sx,y*sy,(x+s)*sx,(y+h)*sy,c,.8,'',.35*op);x+=s;w-=s}
+    else if(dir==='T'){s=w;a=[x,y];b=[x+s,y+s];grid+=ln(x*sx,(y+s)*sy,(x+w)*sx,(y+s)*sy,c,.8,'',.35*op);y+=s;h-=s}
+    else if(dir==='R'){s=h;a=[x+w,y];b=[x+w-s,y+s];grid+=ln((x+w-s)*sx,y*sy,(x+w-s)*sx,(y+h)*sy,c,.8,'',.35*op);w-=s}
+    else{s=w;a=[x+w,y+h];b=[x,y+h-s];grid+=ln(x*sx,(y+h-s)*sy,(x+w)*sx,(y+h-s)*sy,c,.8,'',.35*op);h-=s}
+    if(!d)d=`M${a[0]*sx},${a[1]*sy}`;d+=` A${s*sx},${s*sy} 0 0 1 ${b[0]*sx},${b[1]*sy}`;}
+  const tf=(flip.includes('x')?`translate(${W},0) scale(-1,1) `:'')+(flip.includes('y')?`translate(0,${H}) scale(1,-1)`:'');
+  return `<g transform="${tf}">${grid}<path d="${d}" fill="none" stroke="${c}" stroke-width="${sw}" opacity="${op}"/></g>`;
+}
+function thirds(W,H,op=.85,sw=1){let s='';for(const f of[1/3,2/3]){s+=ln(W*f,0,W*f,H,C.y,sw,'',op)+ln(0,H*f,W,H*f,C.y,sw,'',op)}for(const a of[1/3,2/3])for(const b of[1/3,2/3])s+=`<circle cx="${W*a}" cy="${H*b}" r="${3.5*sw}" fill="none" stroke="${C.y}" stroke-width="${1.2*sw}" opacity="${op}"/>`;return s}
+
+/* ---------- viewfinder overlay ---------- */
+const CUTS=[
+ {id:'head',short:'头顶留白',y:-.08,ok:true,name:'头顶一拳留白',en:'Headroom 10–15%',shot:'所有景别通用',why:'头顶到画框上沿留出约一拳，大约画高的 10–15%。贴边会让人物顶天、显得憋闷；留太多又会把主体稀释成小人。',tip:'一拳留白刚刚好，顶天立地是大忌'},
+ {id:'chin',short:'下巴喉结',y:.13,ok:false,name:'下巴与喉结',en:'Chin / Throat',shot:'裁切雷区',why:'画框底边贴着下巴或卡在喉结，脸像悬浮在画面里，压迫感极强。特写要么切到锁骨以下，要么大胆裁掉额头、保留完整下巴。',tip:'下巴不贴边，锁骨下面切'},
+ {id:'rib',short:'胸腔下沿',y:.30,ok:true,name:'胸腔肋骨下沿',en:'Medium Close-up',shot:'半身肖像',why:'切在胸腔下沿、腰线以上，避开小腹，视线集中到面部神态和肩颈线条。',tip:'半身切胸下，避开小肚腩'},
+ {id:'wrist',short:'手腕',y:.48,ok:false,name:'手腕',en:'Wrist',shot:'裁切雷区',why:'手自然下垂时，手腕和胯部差不多高。切在这里，手会像残肢一样漂在画边，四肢的延伸感被破坏。',tip:'手要么全入画，要么整只藏'},
+ {id:'thigh',short:'大腿中段',y:.62,ok:true,name:'大腿中段',en:'Cowboy Shot · 七分身',shot:'七分身',why:'保留骨盆和大腿的自然线条，画框外的腿会被观众自动补全，是最显腿长的半身景别。',tip:'七分切大腿，腿长靠脑补'},
+ {id:'knee',short:'膝盖',y:.72,ok:false,name:'膝盖正中',en:'Knee',shot:'裁切雷区',why:'膝盖是最显眼的关节。正好切在膝盖，画面会出现明显的截肢感，人显得又短又粗。往上切到大腿，或往下切到小腿肚。',tip:'膝盖一刀切，身高砍一截'},
+ {id:'calf',short:'小腿肚',y:.82,ok:true,name:'小腿肚饱满处',en:'Calf Shot',shot:'行走抓拍',why:'切在小腿最饱满的位置，保留完整步态和动感，身材比例舒服，适合街拍走路。',tip:'走路切小腿，动感不丢腿'},
+ {id:'ankle',short:'脚踝',y:.95,ok:false,name:'脚踝',en:'Ankle',shot:'裁切雷区',why:'切掉脚掌只留脚踝，人像踩不到地面，比例马上变短。全身照要让脚底贴边完整入画，否则就往上切到小腿肚。',tip:'全身要见鞋，脚踝不能切'}
+];
+/* bb: subject box that must stay fully in frame; pf: person [centerX, headTop, soles] in image coords (soles>1 when cut off) */
+const BB={snow:[.37,.46,.43,.57],cliff:[.57,.41,.63,.51],reflect:[.2,.25,.8,.7],sroad:[.4,.35,.6,.95],summit:[.44,.35,.56,.94],hiker:[.23,.2,.38,.84],canyon:[.38,.3,.64,.95],friends:[.36,.55,.68,1],sea:[.43,.45,.58,1],beach:[.4,.05,.85,1],palm:[0,.2,.85,.8],pier:[.45,.15,.85,.85],city:[.44,.52,.51,.74],neonman:[.35,.1,.65,1],fairy:[.6,.18,.82,.86],girl:[.15,.15,.85,1],redsweater:[.25,.15,.95,1],studiocolor:[.15,.08,.95,1],cafe:[.08,.1,.6,1],couple:[.44,.48,.54,.66],lakeman:[.46,.36,.54,.57],rooftop:[.69,.44,.77,.68],mountainman:[.19,.24,.36,.68],alone:[.02,.04,.98,.82],daylight:[.28,.4,.5,.66],peace:[.22,.4,.82,1],creator:[.08,.08,.92,1],curly:[.1,.02,.9,1],reader:[.25,0,.95,1],nya:[.3,.15,.9,1],
+ tree:[.2,.1,.8,.9],palmroad:[.3,0,.7,1],flower:[.2,.2,.8,.8],sky:[.2,.3,.9,.7],mirror:[.6,.2,.95,.9],chair:[.4,.08,.7,.92],coffee:[.35,.65,.6,.9],coffee2:[.3,.15,.7,.8],food:[.1,.1,.6,.6],flatlay:[.05,.05,.95,.95],lights:[.35,.45,.8,.75],arch:[.3,.35,.7,.8],arch2:[.3,.3,.65,.8],street:[.4,.3,.7,.9],car:[.06,.3,.94,.88],flowers:[.35,.1,1,.9],citynight:[.3,.3,.7,1]};
+const PF={snow:[.4,.47,.555],cliff:[.6,.425,.5],summit:[.5,.36,.93],hiker:[.3,.22,.82],sea:[.5,.47,1.7],city:[.475,.53,.72],fairy:[.69,.2,.75],studiocolor:[.5,.1,1.55],couple:[.49,.5,.64],lakeman:[.5,.38,.555],rooftop:[.725,.46,.66],mountainman:[.27,.27,.66],alone:[.5,.06,.8]};
+const PERSON_GUIDES=['cut','full','cowboy','horizon'];
+function cutCx(W,H){return Math.min(W*.36,H*.88*.2+10)}
+function drawGuide(id,W,H,flip){
+  let s='';const fs=Math.max(10,Math.min(12,W/32));
+  switch(id){
+  case 'thirds': s+=thirds(W,H)+tx(W*2/3+8,H/3-8,'主体 / 人脸',C.y,fs);break;
+  case 'small':{
+    s+=ln(W/3,0,W/3,H,C.y,1,'',.3)+ln(W*2/3,0,W*2/3,H,C.y,1,'',.3);
+    s+=ln(0,H*2/3,W,H*2/3,C.y,1.4,'6 4')+tx(8,H*2/3-7,'地平线 · 下三分',C.y,fs);
+    const h=H/9,cx=W*2/3,top=H*2/3+H*.03-h; s+=fig(cx,top,h,C.g,'rgba(61,220,132,.15)','');
+    s+=`<rect x="${cx-h*.22}" y="${top-4}" width="${h*.44}" height="${h+8}" fill="none" stroke="${C.g}" stroke-dasharray="3 3"/>`+tx(cx-h*.3,top+h*.45,'人 ≈ 1/9 画高',C.g,fs,'end');
+    s+=tx(8,22+fs,'天空 / 山体：留白给风景',C.w,fs,'start',500);break;}
+  case 'horizon':{
+    const h=H*.98,top=H*.1,cx=W/2,neck=top+.125*h,waist=top+.5*h;
+    s+=fig(cx,top,h);
+    s+=`<rect x="0" y="${neck-5}" width="${W}" height="10" fill="${C.r}" opacity=".22"/>`+ln(0,neck,W,neck,C.r,1.6)+tx(8,neck-9,'✗ 地平线穿颈 = 割喉',C.r,fs);
+    s+=ln(0,waist,W,waist,C.g,1.6,'6 4')+tx(8,waist-8,'✓ 蹲低机位：地平线落腰下',C.g,fs);
+    const ax=W-24;s+=`<path d="M${ax},${neck+10} L${ax},${waist-10} M${ax-5},${waist-16} L${ax},${waist-10} L${ax+5},${waist-16}" stroke="${C.g}" stroke-width="1.6" fill="none"/>`;break;}
+  case 'sroad':{
+    const P=[[.28,1.02],[.66,.86],[.36,.68],[.6,.52],[.53,.4]].map(([a,b])=>[a*W,b*H]);
+    s+=`<path d="${smooth(P)}" fill="none" stroke="${C.y}" stroke-width="${Math.max(10,W*.05)}" opacity=".16" stroke-linecap="round"/><path d="${smooth(P)}" fill="none" stroke="${C.y}" stroke-width="1.8" stroke-dasharray="7 5"/>`;
+    s+=`<circle cx="${.53*W}" cy="${.38*H}" r="5" fill="none" stroke="${C.w}" stroke-width="1.4"/>`+tx(.53*W+10,.38*H+4,'消失点',C.w,fs);
+    const h=H*.1;s+=fig(.6*W,.53*H-h,h,C.g,'rgba(61,220,132,.18)','');s+=tx(.6*W-h*.3,.53*H-h*.4,'人站弯道尽头',C.g,fs,'end');break;}
+  case 'layers':{
+    const B=[[0,.36,'背景 · 交代环境','rgba(120,170,255,.10)'],[.36,.72,'中景 · 人物焦点','rgba(227,181,91,.09)'],[.72,1,'前景 · 花草虚化遮挡','rgba(61,220,132,.12)']];
+    for(const[a,b,l,f]of B){s+=`<rect x="0" y="${a*H}" width="${W}" height="${(b-a)*H}" fill="${f}"/>`;if(a>0)s+=ln(0,a*H,W,a*H,C.w,1,'5 4',.7);s+=tx(10,a*H+18,l,C.w,fs)}
+    const h=H*.3;s+=fig(W*.62,H*.70-h,h,C.y,'rgba(227,181,91,.12)','');break;}
+  case 'cowboy':{
+    const top=H*.1,h=H*.9/.62;s+=fig(W/2,top,h);
+    s+=ln(0,top,W,top,C.g,1.6,'6 4')+tx(8,top-6,'✓ 头顶留一拳 10%',C.g,fs);
+    const rib=top+.3*h;s+=ln(0,rib,W,rib,C.g,1,'3 4',.6)+tx(W-8,rib-6,'备选：胸下半身',C.g,fs,'end',500);
+    s+=`<rect x="0" y="${H-5}" width="${W}" height="5" fill="${C.g}" opacity=".85"/>`+tx(8,H-12,'✓ 底边切在大腿中段',C.g,fs);
+    s+=tx(W-8,H-12,'膝盖在框外 ✓',C.w,fs,'end',500);break;}
+  case 'full':{
+    const top=H*.08,h=H*.89;s+=fig(W/2,top,h);
+    s+=ln(0,top,W,top,C.g,1.6,'6 4')+tx(8,top-6,'✓ 头顶少留白',C.g,fs);
+    s+=ln(0,top+h,W,top+h,C.g,1.6,'6 4')+tx(8,top+h-7,'✓ 脚尖贴近下边',C.g,fs);
+    const ank=top+.95*h;s+=ln(W/2-h*.12,ank,W/2+h*.12,ank,C.r,1.6)+tx(W/2+h*.14,ank+4,'✗ 脚踝',C.r,fs);
+    const lx=W*.82,a=top+.51*h,b=top+h;s+=`<path d="M${lx},${a} L${lx},${b} M${lx-4},${a+6} L${lx},${a} L${lx+4},${a+6} M${lx-4},${b-6} L${lx},${b} L${lx+4},${b-6}" stroke="${C.y}" stroke-width="1.5" fill="none"/>`+tx(lx-6,(a+b)/2,'腿长',C.y,fs,'end');
+    s+=tx(W-8,top+18,'机位：腰部高度 · 微俯',C.w,fs,'end',500);break;}
+  case 'vp':{
+    const vx=W*.5,vy=H*.42;for(const[a,b]of[[0,H],[W,H],[0,H*.15],[W,H*.15],[W*.3,H],[W*.7,H]])s+=ln(a,b,vx,vy,C.y,1.2,'6 4',.8);
+    s+=`<circle cx="${vx}" cy="${vy}" r="5" fill="none" stroke="${C.w}" stroke-width="1.5"/>`+tx(vx+9,vy-7,'消失点',C.w,fs);
+    const h=H*.22;s+=fig(W*.4,H*.86-h,h,C.g,'rgba(61,220,132,.16)','');s+=tx(W*.4-h*.22,H*.86-h*.5,'人走在汇聚线上',C.g,fs,'end');break;}
+  case 'diag':{
+    s+=`<path d="M0,${H} L${W},0" stroke="${C.y}" stroke-width="${Math.min(W,H)*.14}" opacity=".1"/>`+ln(0,H,W,0,C.y,1.8,'8 5')+ln(0,0,W,H,C.w,1,'3 6',.35);
+    s+=tx(W*.52,H*.44,'主对角线 · 动感方向',C.y,fs);s+=tx(8,H-10,'树干 / 楼梯 / 手臂 / 身体',C.w,fs,'start',500);break;}
+  case 'sym':{
+    s+=ln(W/2,0,W/2,H,C.y,1.6)+ln(0,H/2,W,H/2,C.w,1,'6 5',.6);
+    for(const f of[.2,.35,.65,.8])s+=ln(W*f-4,H/2,W*f+4,H/2,C.w,1.4)+ln(W/2-5,H*f,W/2+5,H*f,C.y,1.4);
+    s+=tx(W/2+8,16+fs,'中轴',C.y,fs)+tx(8,H/2-8,'上实',C.w,fs,'start',500)+tx(8,H/2+fs+6,'下虚 · 倒影',C.w,fs,'start',500);
+    const h=H*.42;s+=fig(W/2,H*.5-h*.95,h,C.y,'rgba(227,181,91,.1)','4 3');break;}
+  case 'frame':{
+    const m=Math.min(W,H)*.13;s+=`<path d="M0,0 H${W} V${H} H0 Z M${m},${m} V${H-m*.6} H${W-m} V${m} Z" fill="rgba(0,0,0,.38)" fill-rule="evenodd"/>`;
+    s+=`<rect x="${m}" y="${m}" width="${W-2*m}" height="${H-m*1.6}" fill="none" stroke="${C.y}" stroke-width="1.6" stroke-dasharray="8 5" rx="4"/>`;
+    s+=tx(m+6,m-8,'门窗 / 拱门 / 树枝 / 灯管 做框',C.y,fs);const h=(H-m*1.6)*.7;s+=fig(W/2,H-m*.6-h,h);break;}
+  case 'space':{
+    s+=`<rect x="0" y="0" width="${W*.62}" height="${H}" fill="rgba(120,170,255,.10)"/>`+ln(W*.62,0,W*.62,H,C.w,1,'5 4',.6);
+    s+=tx(W*.31,H*.45,'留白 ≥ 60%',C.w,fs+2,'middle',700)+tx(W*.31,H*.45+fs+8,'天空 / 水面 / 墙面',C.w,fs,'middle',500);
+    const h=H*.36,cx=W*.78;s+=fig(cx,H*.86-h,h,C.g,'rgba(61,220,132,.14)','');
+    s+=`<path d="M${cx-h*.18},${H*.86-h*.88} L${W*.66},${H*.86-h*.88} M${W*.66+7},${H*.86-h*.88-5} L${W*.66},${H*.86-h*.88} L${W*.66+7},${H*.86-h*.88+5}" stroke="${C.y}" stroke-width="1.6" fill="none"/>`+tx(W*.66,H*.86-h*.88-9,'视线方向',C.y,fs);break;}
+  case 'spiral': s+=ln(W*.382,0,W*.382,H,C.w,.8,'3 5',.35)+ln(W*.618,0,W*.618,H,C.w,.8,'3 5',.35)+ln(0,H*.382,W,H*.382,C.w,.8,'3 5',.35)+ln(0,H*.618,W,H*.618,C.w,.8,'3 5',.35)+spiral(W,H,flip);break;
+  case 'sit':{
+    const P=[[.5,.2],[.27,.8],[.76,.86]].map(([a,b])=>[a*W,b*H]);
+    s+=`<polygon points="${P.map(p=>p.join(',')).join(' ')}" fill="rgba(227,181,91,.1)" stroke="${C.y}" stroke-width="1.6" stroke-dasharray="7 4"/>`;
+    ['头','膝','臀 / 手撑'].forEach((l,i)=>{s+=`<circle cx="${P[i][0]}" cy="${P[i][1]}" r="5" fill="${C.y}"/>`+tx(P[i][0]+[10,-10,0][i],P[i][1]+[-8,16,22][i],l,C.y,fs,['start','end','middle'][i])});
+    s+=tx(W/2,H*.62,'稳定三角',C.w,fs,'middle',500);break;}
+  case 'cut':{
+    const top=H*.07,h=H*.88,cx=cutCx(W,H);s+=fig(cx,top,h);
+    for(const c of CUTS){const y=top+c.y*h,col=c.ok?C.g:C.r;s+=ln(Math.max(4,cx-h*.16),y,cx+h*.16,y,col,c.ok?1.8:1.6,c.ok?'':'4 3');s+=tx(cx+h*.18,y+4,(c.ok?'✓ ':'✗ ')+c.short,col,fs)}
+    break;}
+  }
+  return s;
+}
+
+/* ---------- state ---------- */
+const S={tab:'vf',ratio:'4:5',guide:'thirds',flip:'',zoom:1,cx:.5,cy:.45,src:{type:'img',k:'girl'},facing:'environment',stream:null,uploads:[],roll:[],f:{sc:'all',pr:'all',cp:'all'},xray:{},preset:0,fw:0,fh:0};
+const frame=$('#frame'),mImg=$('#mImg'),mVid=$('#mVid'),ov=$('#ov');
+
+/* ---------- toast ---------- */
+let tT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('on'),2400)}
+
+/* ---------- tabs ---------- */
+const SUB={vf:'VF-01 · Viewfinder',cut:'CL-02 · Cutlines',gal:'XR-03 · X-Ray Gallery',sub:'SB-04 · Subjects',ai:'AI-05 · Coach'};
+function setTab(t){S.tab=t;for(const b of document.querySelectorAll('.tabbar button'))b.setAttribute('aria-selected',b.dataset.tab===t);
+  for(const id of['vf','cut','gal','sub','ai'])$('#tab-'+id).hidden=id!==t;$('#tbSub').textContent=SUB[t];if(t==='vf')requestAnimationFrame(fit)}
+document.querySelectorAll('.tabbar button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+
+/* ---------- viewfinder UI ---------- */
+function renderRatio(){$('#ratioSeg').innerHTML=RATIOS.map(r=>`<button aria-pressed="${r===S.ratio}" data-r="${r}">${r}</button>`).join('');
+  $('#ratioSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.ratio=b.dataset.r;if(S.src.type==='img'&&!S.anchor)S.anchor={a:[S.cx,S.cy],t:[.5,.5],z:S.zoom};renderRatio();fit()})}
+function renderZoom(){$('#zoomBox').innerHTML=ZOOMS.map(z=>`<button aria-pressed="${Math.abs(z.z-S.zoom)<.01}" data-z="${z.z}">${z.l}</button>`).join('');
+  $('#zoomBox').querySelectorAll('button').forEach(b=>b.onclick=e=>{e.stopPropagation();S.anchor=null;S.zoom=+b.dataset.z;renderZoom();layoutMedia()})}
+function renderGuides(){$('#guideChips').innerHTML=GUIDES.map(g=>`<button class="chip" aria-pressed="${g.id===S.guide}" data-g="${g.id}">${g.name}</button>`).join('');
+  $('#guideChips').querySelectorAll('button').forEach(b=>b.onclick=()=>pickGuide(b.dataset.g));
+  const g=GMAP[S.guide];$('#tipK').textContent=g.name;$('#tipV').textContent=g.tip;
+  const L=GP[S.guide]||[],nb=$('#nextBtn');nb.hidden=!L.length;
+  if(L.length){const cur=S.src.type==='img'?L.findIndex(x=>x.k===S.src.k):-1;nb.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>${cur>=0?`样片 ${cur+1}/${L.length}`:`匹配样片 ${L.length}`}`}}
+function pickGuide(g,step){const same=g===S.guide;S.guide=g;const L=GP[g]||[];
+  const auto=S.src.type==='img'||step;
+  if(L.length&&auto){const cur=L.findIndex(x=>S.src.type==='img'&&x.k===S.src.k);S.gi=(same||step)&&cur>=0?(cur+1)%L.length:0;applyPair(L[S.gi]);
+    const t=ALLP[L[S.gi].k].title;toast(`${GMAP[g].name} · 样片 ${S.gi+1}/${L.length}：${t}`+(L.length>1?'　再点一次换下一张':''))}
+  else if(same&&g==='spiral'){const f=['','x','y','xy'];S.flip=f[(f.indexOf(S.flip)+1)%4];toast('螺旋方向已切换')}
+  renderGuides();renderSrcs();drawOv()}
+function applyPair(pr){S.ratio=bestRatio(pr.k,pr.r);if(pr.fl!==undefined)S.flip=pr.fl;renderRatio();setSrc({type:'img',k:pr.k});S.anchor=pr;fit()}
+function viewFrac(k,R){const[iw,ih]=IMGDIM[k];return[Math.min(1,R*ih/iw),Math.min(1,iw/(R*ih))]}
+function ratioFits(k,r){const[a,b]=r.split(':').map(Number);const[vw,vh]=viewFrac(k,a/b);const bb=BB[k]||[0,0,1,1];return vw>=bb[2]-bb[0]+.04&&vh>=bb[3]-bb[1]+.04}
+function bestRatio(k,want){if(ratioFits(k,want))return want;const[a,b]=want.split(':').map(Number),w=a/b;
+  const ok=RATIOS.filter(r=>ratioFits(k,r));if(!ok.length)return want;return ok.sort((x,y)=>{const f=r=>{const[c,d]=r.split(':').map(Number);return Math.abs(Math.log(c/d/w))};return f(x)-f(y)})[0]}
+function applyAnchor(){const A=S.anchor;if(!A||S.src.type!=='img'||!S.fw)return;const k=S.src.k,[iw,ih]=IMGDIM[k];const W=S.fw,H=S.fh,s0=Math.max(W/iw,H/ih);
+  const bb=BB[k]||[0,0,1,1],m=.03;
+  let a,t,z=A.z||1;const tu=A.t[0]==='cut'?cutCx(W,H)/W:A.t[0];
+  if(A.f){const frac=(A.f[2]-A.f[1])*ih*s0/H;z=(A.t[2]-A.t[1])/frac;a=[A.f[0],A.f[1]];t=[tu,A.t[1]]}else{a=A.a;t=[tu,A.t[1]]}
+  const zmax=Math.min(W/(iw*s0*Math.min(1,bb[2]-bb[0]+2*m)),H/(ih*s0*Math.min(1,bb[3]-bb[1]+2*m)));
+  z=Math.max(1,Math.min(3.5,z,zmax));S.zoom=z;
+  const vw=W/(iw*s0*z),vh=H/(ih*s0*z);let cx=a[0]-(t[0]-.5)*vw,cy=a[1]-(t[1]-.5)*vh;
+  const keep=(c,lo0,hi0,v)=>{const lo=hi0+m-v/2,hi=lo0-m+v/2;return lo<=hi?Math.min(hi,Math.max(lo,c)):(lo0+hi0)/2};
+  S.cx=keep(cx,bb[0],bb[2],vw);S.cy=keep(cy,bb[1],bb[3],vh);renderZoom()}
+const ICON_CAM='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const ICON_UP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4m-5 5 5-5 5 5M4 16v4h16v-4"/></svg>';
+function renderSrcs(){
+  let h=`<button class="src" data-s="cam" aria-pressed="${S.src.type==='cam'}" aria-label="实时镜头">${ICON_CAM}<span>实时</span></button>`;
+  h+=`<button class="src" data-s="up" aria-label="上传照片">${ICON_UP}<span>上传</span></button>`;
+  S.uploads.forEach((u,i)=>h+=`<button class="src" data-s="u${i}" aria-pressed="${S.src.type==='upload'&&S.src.i===i}" aria-label="我的照片"><img src="${u}" alt=""></button>`);
+  const M=[...new Set((GP[S.guide]||[]).map(x=>x.k))];const order=[...M,...ALLKEYS.filter(k=>!M.includes(k))];
+  order.forEach((k,i)=>{const p=ALLP[k];if(i===M.length&&M.length)h+=`<span class="sdiv" aria-hidden="true"></span>`;h+=`<button class="src${M.includes(k)?' m':''}" data-s="p:${k}" aria-pressed="${S.src.type==='img'&&S.src.k===k}" aria-label="${esc(p.title)}"><img src="${THUMB[k]}" alt="" loading="lazy"></button>`});
+  $('#srcs').innerHTML=h;
+  $('#srcs').querySelectorAll('button').forEach(b=>b.onclick=()=>{const s=b.dataset.s;
+    if(s==='cam')return startCam();if(s==='up')return $('#fileUp').click();
+    if(s[0]==='u')return setSrc({type:'upload',i:+s.slice(1)});
+    const k=s.slice(2),L=GP[S.guide]||[],pr=L.find(x=>x.k===k);if(pr){applyPair(pr);renderGuides()}else{const p=ALLP[k];setSrc({type:'img',k},p.fx,p.fy)}})}
+function setSrc(src,fx=.5,fy=.5){
+  if(src.type!=='cam')stopCam();S.src=src;S.cx=fx;S.cy=fy;S.anchor=src.type==='img'?{a:[fx,fy],t:[.5,.5]}:null;
+  if(src.type==='img'){mImg.src=IMG[src.k];$('#hudSrc').textContent='SAMPLE';$('#hudDot').className='dot';const p=ALLP[src.k];S.focal=p.focal}
+  else if(src.type==='upload'){mImg.src=S.uploads[src.i];$('#hudSrc').textContent='IMPORT';$('#hudDot').className='dot';S.focal=''}
+  mImg.hidden=src.type==='cam';mVid.hidden=src.type!=='cam';
+  renderSrcs();if(mImg.complete)layoutMedia();hud()}
+mImg.onload=()=>layoutMedia();
+function hud(){const live=S.src.type==='cam';$('#hudTr').innerHTML=`${S.ratio}<br>${live?(S.facing==='user'?'FRONT':'REAR')+' CAM':S.focal?'REF '+S.focal:'IMPORT'}`;
+  $('#hudBl').textContent=live?'AUTO · 1/125 · ƒ1.8':'ISO 100 · 1/250 · ƒ2.0'}
+
+/* fit frame into stage */
+function fit(){if(S.tab!=='vf')return;const st=$('#stage');const cs=getComputedStyle(st);
+  const aw=st.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight),ah=st.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const [a,b]=S.ratio.split(':').map(Number),r=a/b;let w,h;if(aw/ah>r){h=ah;w=ah*r}else{w=aw;h=aw/r}
+  w=Math.floor(w);h=Math.floor(h);frame.style.width=w+'px';frame.style.height=h+'px';S.fw=w;S.fh=h;layoutMedia();hud()}
+function natural(){const v=S.src.type==='cam';return v?[mVid.videoWidth,mVid.videoHeight]:[mImg.naturalWidth,mImg.naturalHeight]}
+function geom(){const[iw,ih]=natural();if(!iw)return null;const W=S.fw,H=S.fh;const sc=Math.max(W/iw,H/ih)*S.zoom;const dw=iw*sc,dh=ih*sc;
+  const hx=W/(2*dw),hy=H/(2*dh);S.cx=Math.min(1-hx,Math.max(hx,S.cx));S.cy=Math.min(1-hy,Math.max(hy,S.cy));
+  return{iw,ih,dw,dh,left:W/2-S.cx*dw,top:H/2-S.cy*dh,W,H}}
+function layoutMedia(){applyAnchor();frame.classList.toggle('matched',S.src.type==='img');const g=geom();S.geo=g;
+  const pf=S.src.type==='img'&&PF[S.src.k];S.person=g&&pf?{x:g.left+pf[0]*g.dw,top:g.top+pf[1]*g.dh,bot:g.top+pf[2]*g.dh}:null;const el=S.src.type==='cam'?mVid:mImg;if(g){el.style.width=g.dw+'px';el.style.height=g.dh+'px';
+  const mir=S.src.type==='cam'&&S.facing==='user';el.style.transform=`translate(${g.left}px,${g.top}px)`+(mir?` translate(${g.dw}px,0) scale(-1,1)`:'')}drawOv()}
+function drawOv(){const W=S.fw,H=S.fh;if(!W)return;ov.setAttribute('viewBox',`0 0 ${W} ${H}`);S.verdict=null;
+  const g=S.geo,k=S.src.type==='img'?S.src.k:null;
+  ov.innerHTML=(!k||!g)?drawGuide(S.guide,W,H,S.flip):drawMatched(S.guide,W,H,g,ALLP[k],S.person);
+  const vd=$('#verdict');if(S.verdict){vd.hidden=false;vd.textContent=S.verdict.v;vd.style.color=S.verdict.c}else vd.hidden=true}
+function drawMatched(id,W,H,g,p,P){
+  const fs=Math.max(10,Math.min(12,W/32));let s='';
+  if(PERSON_GUIDES.includes(id)&&P)return personGuide(id,W,H,P,fs);
+  if(id==='thirds')s+=thirds(W,H);
+  else if(id==='spiral')s+=ln(W*.382,0,W*.382,H,C.w,.8,'3 5',.35)+ln(W*.618,0,W*.618,H,C.w,.8,'3 5',.35)+ln(0,H*.382,W,H*.382,C.w,.8,'3 5',.35)+ln(0,H*.618,W,H*.618,C.w,.8,'3 5',.35)+spiral(W,H,S.flip);
+  else if(id==='sym')s+=ln(W/2,0,W/2,H,C.y,1.2,'',.7);
+  else if(id==='small')s+=ln(0,H*2/3,W,H*2/3,C.y,1,'6 4',.6)+ln(W*2/3,0,W*2/3,H,C.y,1,'6 4',.35);
+  else if(id==='cut'||id==='full'||id==='cowboy'||id==='horizon')return drawGuide(id,W,H,S.flip);
+  if(id==='none')return s;
+  const skip=['thirds','spiral'];
+  s+=`<g transform="translate(${g.left},${g.top})">${opsSvg({ops:p.ops.filter(o=>!skip.includes(o.t))},g.dw,g.dh,{fs,sw:1.3,vx0:-g.left+8,vy0:-g.top})}</g>`;
+  return s}
+function personGuide(id,W,H,P,fs){
+  let s='';const h=P.bot-P.top,cx=P.x;
+  const lab=(x,y,t,c,a='start')=>tx(x,y,t,c,fs,a);
+  const right=cx+h*.24<W-70;const lx=right?cx+h*.2:cx-h*.2,la=right?'start':'end';
+  const hr=P.top/H*100;
+  const hc=hr<3?C.r:(hr<6||hr>22?C.o:C.g);
+  const headTxt=hr<0?'头部被裁掉':hr<3?`头顶 ${hr.toFixed(0)}% 太挤`:hr>22?`头顶 ${hr.toFixed(0)}% 偏多`:`头顶留白 ${hr.toFixed(0)}%`;
+  if(P.top>2)s+=`<rect x="0" y="0" width="${W}" height="${P.top}" fill="${hc}" opacity=".08"/>`+ln(0,P.top,W,P.top,hc,1.4,'6 4');
+  if(id==='cut'){
+    for(const c of CUTS){if(c.id==='head')continue;const y=P.top+c.y*h;if(y<4||y>H-4)continue;const col=c.ok?C.g:C.r;
+      s+=ln(Math.max(2,cx-h*.17),y,Math.min(W-2,cx+h*.17),y,col,c.ok?1.8:1.5,c.ok?'':'4 3')+lab(lx,y+4,(c.ok?'✓ ':'✗ ')+c.short,col,la)}}
+  if(id==='full'){const foot=(H-P.bot)/H*100;
+    if(P.bot<=H){const fc=foot>8?C.o:C.g;s+=ln(0,P.bot,W,P.bot,fc,1.4,'6 4')+lab(8,Math.min(H-8,P.bot+fs+4),foot>8?`脚下留白 ${foot.toFixed(0)}% · 可再贴近下边`:`✓ 脚下留白 ${foot.toFixed(0)}%`,fc)}
+    const a=P.top+.51*h,b=Math.min(P.bot,H-2),x=Math.min(W-12,cx+h*.22);s+=`<path d="M${x},${a} L${x},${b} M${x-4},${a+6} L${x},${a} L${x+4},${a+6} M${x-4},${b-6} L${x},${b} L${x+4},${b-6}" stroke="${C.y}" stroke-width="1.5" fill="none"/>`+lab(x-6,(a+b)/2,'腿长',C.y,'end')}
+  if(id==='horizon'){const neck=P.top+.125*h,waist=P.top+.5*h;
+    if(neck<H)s+=`<rect x="0" y="${neck-4}" width="${W}" height="8" fill="${C.r}" opacity=".2"/>`+ln(0,neck,W,neck,C.r,1.5)+lab(8,neck-8,'✗ 地平线别落在这条线（脖子）',C.r);
+    if(waist<H)s+=ln(0,waist,W,waist,C.g,1.5,'6 4')+lab(8,waist-8,'✓ 地平线落在腰线以下',C.g)}
+  // bottom-edge verdict
+  let v='',vc=C.g;
+  if(P.bot>H+2){const f=(H-P.top)/h;let best=null;for(const c of CUTS){if(c.id==='head')continue;const d=Math.abs(f-c.y);if(!best||d<best.d)best={c,d}}
+    if(best.d<.04){v=(best.c.ok?'✓ 底边切在':'✗ 底边切在')+best.c.name;vc=best.c.ok?C.g:C.r}else{v='底边落在'+CUTS.filter(c=>c.y<f).slice(-1)[0].short+'与'+(CUTS.find(c=>c.y>f)||{short:'脚底'}).short+'之间';vc=C.w}}
+  else if(id!=='full'){v='✓ 全身完整入画';}
+  if(id==='full'&&!v)v=P.bot<=H?'全身完整入画':'';
+  const rank=c=>c===C.r?2:c===C.o?1:0,worst=rank(hc)>=rank(vc)?hc:vc;
+  S.verdict=id==='horizon'?null:{v:headTxt+(v?' · '+v.replace(/^[✓✗] ?/,''):''),c:worst===C.w?C.g:worst};
+  return s}
+/* drag to recompose */
+let drag=null;
+frame.addEventListener('pointerdown',e=>{if(e.target.closest('.zoom'))return;S.anchor=null;const g=geom();if(!g)return;drag={x:e.clientX,y:e.clientY,cx:S.cx,cy:S.cy,dw:g.dw,dh:g.dh};frame.setPointerCapture(e.pointerId)});
+frame.addEventListener('pointermove',e=>{if(!drag)return;const mir=S.src.type==='cam'&&S.facing==='user'?-1:1;S.cx=drag.cx-mir*(e.clientX-drag.x)/drag.dw;S.cy=drag.cy-(e.clientY-drag.y)/drag.dh;layoutMedia()});
+frame.addEventListener('pointerup',()=>drag=null);frame.addEventListener('pointercancel',()=>drag=null);
+frame.addEventListener('dblclick',()=>{S.anchor=null;S.cx=.5;S.cy=.5;S.zoom=1;renderZoom();layoutMedia()});
+frame.addEventListener('wheel',e=>{e.preventDefault();S.anchor=null;let i=ZOOMS.findIndex(z=>Math.abs(z.z-S.zoom)<.01);if(i<0)i=ZOOMS.findIndex(z=>z.z>S.zoom)-1;const n=Math.min(ZOOMS.length-1,Math.max(0,i+(e.deltaY<0?1:-1)));S.zoom=ZOOMS[n].z;renderZoom();layoutMedia()},{passive:false});
+new ResizeObserver(()=>fit()).observe($('#stage'));
+
+/* camera */
+async function startCam(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){camFallback();return}
+  try{stopCam();const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:S.facing,width:{ideal:1920}},audio:false});
+    S.stream=st;mVid.srcObject=st;await mVid.play();S.src={type:'cam'};S.cx=.5;S.cy=.5;mImg.hidden=true;mVid.hidden=false;
+    $('#hudSrc').textContent='LIVE';$('#hudDot').className='dot live';renderSrcs();
+    if(mVid.videoWidth)layoutMedia();else mVid.onloadedmetadata=()=>layoutMedia();hud();toast('实时镜头已开启，拖动可模拟平移机位')}
+  catch(err){camFallback()}}
+function camFallback(){toast('当前预览环境不允许直接调用摄像头，已改为打开系统相机/相册');try{$('#fileCam').click()}catch(e){}}
+function stopCam(){if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null}}
+$('#flipBtn').onclick=()=>{S.facing=S.facing==='user'?'environment':'user';if(S.src.type==='cam')startCam();else toast(`已切换为${S.facing==='user'?'前置':'后置'}镜头，打开“实时”生效`)};
+function takeFile(f){if(!f)return;const u=URL.createObjectURL(f);S.uploads.unshift(u);S.src={type:'upload',i:0};setSrc({type:'upload',i:0});toast('照片已导入，选一条辅助线试试裁切')}
+$('#fileUp').onchange=e=>{takeFile(e.target.files[0]);e.target.value=''};
+$('#fileCam').onchange=e=>{takeFile(e.target.files[0]);e.target.value=''};
+
+/* shutter sound: Web Audio synthesis */
+let AC=null;
+function clickSound(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t=AC.currentTime;
+  const burst=(at,dur,freq,gain)=>{const n=AC.createBuffer(1,AC.sampleRate*dur,AC.sampleRate),d=n.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3);
+    const s=AC.createBufferSource();s.buffer=n;const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=freq;f.Q.value=.9;const g=AC.createGain();g.gain.value=gain;s.connect(f).connect(g).connect(AC.destination);s.start(at)};
+  const thump=(at)=>{const o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(160,at);o.frequency.exponentialRampToValueAtTime(55,at+.06);g.gain.setValueAtTime(.35,at);g.gain.exponentialRampToValueAtTime(.001,at+.08);o.connect(g).connect(AC.destination);o.start(at);o.stop(at+.09)};
+  burst(t,.035,3200,.9);thump(t);burst(t+.075,.05,2200,.7);thump(t+.075)}catch(e){}}
+function vib(){try{navigator.vibrate&&navigator.vibrate(18)}catch(e){}}
+$('#shutter').onclick=()=>{
+  clickSound();vib();const fl=$('#flash');fl.classList.remove('go');void fl.offsetWidth;fl.classList.add('go');
+  const g=geom();if(!g){toast('画面还没准备好');return}
+  const el=S.src.type==='cam'?mVid:mImg;const sw=g.W/g.dw*g.iw,sh=g.H/g.dh*g.ih,sx=(S.cx*g.iw)-sw/2,sy=(S.cy*g.ih)-sh/2;
+  const k=Math.min(2,1200/Math.max(g.W,g.H)),cv=document.createElement('canvas');cv.width=Math.round(g.W*k);cv.height=Math.round(g.H*k);const ctx=cv.getContext('2d');
+  if(S.src.type==='cam'&&S.facing==='user'){ctx.translate(cv.width,0);ctx.scale(-1,1)}
+  try{ctx.drawImage(el,sx,sy,sw,sh,0,0,cv.width,cv.height);const url=cv.toDataURL('image/jpeg',.85);
+    const d=new Date();S.roll.unshift({url,ratio:S.ratio,guide:GMAP[S.guide].name,time:d.toTimeString().slice(0,5)});renderRoll();toast(`已拍摄 · ${S.ratio} · ${GMAP[S.guide].name}`)}
+  catch(e){toast('这张照片无法保存到胶卷')}};
+function renderRoll(){const b=$('#rollBtn');if(!S.roll.length)return;b.innerHTML=`<img src="${S.roll[0].url}" alt="最近拍摄"><span class="n">${S.roll.length}</span>`}
+$('#rollBtn').onclick=()=>{
+  const sh=$('#sheetIn');
+  sh.innerHTML=`<div class="grab"></div><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="eyebrow">Camera Roll</div><h3 style="font-size:18px;margin-top:2px">本次拍摄 · ${S.roll.length} 张</h3></div><button class="chip" id="closeSheet">关闭</button></div>`+
+  (S.roll.length?`<img class="big" id="bigImg" src="${S.roll[0].url}" alt="拍摄预览"><p class="lede">长按图片可保存到手机相册。</p><div class="rgrid">${S.roll.map((r,i)=>`<figure><button data-i="${i}" style="display:block;width:100%"><img src="${r.url}" alt=""></button><figcaption>${r.ratio} · ${esc(r.guide)} · ${r.time}</figcaption></figure>`).join('')}</div>`
+  :`<p class="lede" style="padding:24px 0">还没有拍摄。回到取景器，按下快门试试。</p>`);
+  $('#sheet').hidden=false;$('#closeSheet').onclick=()=>$('#sheet').hidden=true;
+  sh.querySelectorAll('.rgrid button').forEach(b=>b.onclick=()=>$('#bigImg').src=S.roll[+b.dataset.i].url)};
+$('#sheet').onclick=e=>{if(e.target.id==='sheet')$('#sheet').hidden=true};
+
+$('#nextBtn').onclick=()=>pickGuide(S.guide,true);
+function importToVF(p,label){S.ratio=bestRatio(p.k,p.ratio);S.guide=p.guide;S.flip=(p.ops.find(o=>o.t==='spiral')||{}).flip||'';S.zoom=1;renderRatio();renderZoom();const pr=(GP[p.guide]||[]).find(x=>x.k===p.k);setTab('vf');if(pr)applyPair(pr);else setSrc({type:'img',k:p.k},p.fx,p.fy);renderGuides();
+  toast(`已带入「${label||p.title}」：${p.ratio} · ${GMAP[p.guide].name} · 参考 ${p.focal}`)}
+
+/* ---------- Cutlines tab ---------- */
+let cutSel='thigh';
+function renderCut(){
+  const top=70,h=520,cx=105,svg=$('#cutSvg');let s='';
+  const c=CUTS.find(x=>x.id===cutSel),yy=top+c.y*h;
+  s+=`<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,255,255,.12)" stroke-width="3"/></pattern></defs>`;
+  if(c.id==='head')s+=`<rect x="0" y="0" width="360" height="${yy}" fill="rgba(0,0,0,.55)"/><rect x="0" y="0" width="360" height="${yy}" fill="url(#hatch)"/>`;
+  else s+=`<rect x="0" y="${yy}" width="360" height="${640-yy}" fill="rgba(0,0,0,.55)"/><rect x="0" y="${yy}" width="360" height="${640-yy}" fill="url(#hatch)"/>`;
+  s+=`<rect x="10" y="${c.id==='head'?yy:6}" width="196" height="${c.id==='head'?634-yy:yy-6}" fill="none" stroke="${C.y}" stroke-width="1.4" stroke-dasharray="6 4" rx="3"/>`;
+  s+=tx(16,(c.id==='head'?yy:6)+16,'取景框',C.y,11,'start',600);
+  s+=fig(cx,top,h,'rgba(236,232,223,.85)','rgba(236,232,223,.08)','');
+  for(const k of CUTS){const y=top+k.y*h,col=k.ok?C.g:C.r,on=k.id===cutSel;
+    s+=`<g class="ln" data-id="${k.id}"><rect x="0" y="${y-12}" width="360" height="24" fill="transparent"/>`;
+    s+=ln(14,y,206,y,col,on?3:1.6,k.ok?'':'5 4',on?1:.85);
+    s+=`<circle cx="214" cy="${y}" r="${on?5:3.5}" fill="${col}"/>`;
+    s+=tx(226,y+4.5,(k.ok?'✓ ':'✗ ')+k.name,on?'#fff':col,on?14:12.5,'start',on?700:500)+`</g>`}
+  svg.innerHTML=s;
+  svg.querySelectorAll('.ln').forEach(g=>g.onclick=()=>{cutSel=g.dataset.id;renderCut()});
+  $('#cutDetail').innerHTML=`<span class="badge ${c.ok?'ok':'bad'}">${c.ok?'● 推荐安全切线':'● 关节裁切雷区'}</span><h3>${c.name}<small>${c.en}</small></h3><p>${c.why}</p><div class="verse">${c.tip}</div>`;
+  $('#cutList').innerHTML=CUTS.map(k=>`<button class="cut-item ${k.ok?'okc':'badc'}" aria-pressed="${k.id===cutSel}" data-id="${k.id}"><i style="background:${k.ok?C.g:C.r}"></i><span>${k.name}</span></button>`).join('');
+  $('#cutList').querySelectorAll('button').forEach(b=>b.onclick=()=>{cutSel=b.dataset.id;renderCut()});
+}
+const trapState={h:'x',p:'x'};
+function sceneHorizon(bad){
+  const hz=bad?86:168;let s=`<svg viewBox="0 0 320 200" role="img" aria-label="地平线示意"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a4a6b"/><stop offset="1" stop-color="#e7a46b"/></linearGradient><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b4a63"/><stop offset="1" stop-color="#0f1c27"/></linearGradient></defs>`;
+  s+=`<rect width="320" height="${hz}" fill="url(#sky)"/><rect y="${hz}" width="320" height="${200-hz}" fill="url(#sea)"/>`;
+  s+=fig(160,40,330,'rgba(10,11,13,.9)','#15171b','');
+  s+=ln(0,hz,320,hz,bad?C.r:C.g,2.2)+tx(10,hz-7,bad?'✗ 海平线横穿脖子':'✓ 蹲低后：海平线落在腰下',bad?C.r:C.g,12);
+  return s+'</svg>'}
+function scenePole(bad){
+  const px=bad?160:236;let s=`<svg viewBox="0 0 320 200" role="img" aria-label="背景柱子示意"><rect width="320" height="200" fill="#26323a"/><rect y="150" width="320" height="50" fill="#1b2328"/>`;
+  s+=`<rect x="${px-7}" y="0" width="14" height="160" fill="#5d4a3a"/><ellipse cx="${px}" cy="10" rx="40" ry="26" fill="#2f4a36"/>`;
+  s+=fig(160,48,300,'rgba(236,232,223,.9)','#c9b49a','');
+  if(bad)s+=`<circle cx="160" cy="44" r="16" fill="none" stroke="${C.r}" stroke-width="2"/>`+tx(182,40,'✗ 树干从头顶“长出来”',C.r,12);
+  else s+=tx(10,24,'✓ 平移半步：树干落在肩侧',C.g,12);
+  return s+'</svg>'}
+function renderTraps(){
+  const H=$('#trapHorizon'),P=$('#trapPole');
+  H.innerHTML=sceneHorizon(trapState.h==='x')+`<div class="body"><div class="row"><h4>海平面 / 地平线“割喉”</h4><div class="ab"><button class="x" aria-pressed="${trapState.h==='x'}" data-v="x">✗ 错误</button><button class="o" aria-pressed="${trapState.h==='o'}" data-v="o">✓ 修正</button></div></div><p>笔直的水平线从脖子或双眼横穿而过，视觉上像把人“切开”。地平线在画面里的高度等于相机高度：蹲低，地平线就落到腰下；站高，就压到头顶之上。</p><div class="verse">海平线，别过颈；蹲一蹲，腰下行</div></div>`;
+  P.innerHTML=scenePole(trapState.p==='x')+`<div class="body"><div class="row"><h4>背景柱子“天灵盖穿刺”</h4><div class="ab"><button class="x" aria-pressed="${trapState.p==='x'}" data-v="x">✗ 错误</button><button class="o" aria-pressed="${trapState.p==='o'}" data-v="o">✓ 修正</button></div></div><p>背景里的电线杆、树干、路灯和人物头部纵向重叠，看起来像从头顶插出来。拍之前扫一眼人物头顶，人或相机横移半步就能避开。</p><div class="verse">按快门前看头顶，柱子挪到肩膀旁</div></div>`;
+  H.querySelectorAll('.ab button').forEach(b=>b.onclick=()=>{trapState.h=b.dataset.v;renderTraps()});
+  P.querySelectorAll('.ab button').forEach(b=>b.onclick=()=>{trapState.p=b.dataset.v;renderTraps()});
+}
+
+/* ---------- Gallery ---------- */
+function opsSvg(p,W,H,o2){let s='';const fs=o2?o2.fs:W*.032,sw=o2?o2.sw:W*.0028;const K=o2?o2.fs/.032:W,LX=o2?Math.max(K*.02,o2.vx0):K*.02,VY=o2?Math.max(H*.1,o2.vy0+fs*2):H*.1;
+  const lab=(x,y,t,c,anchor='start')=>`<text x="${x}" y="${y}" fill="${c}" font-size="${fs}" font-weight="700" text-anchor="${anchor}">${esc(t)}</text>`;
+  for(const o of p.ops){const c=C[o.c]||C.y;
+    if(o.t==='thirds')s+=thirds(W,H,.75,sw*.9);
+    else if(o.t==='spiral')s+=spiral(W,H,o.flip,C[o.c]||C.y,o.op??.85,sw*1.1);
+    else if(o.t==='h'){s+=ln(0,o.y*H,W,o.y*H,c,sw*(o.dash?1:1.4),o.dash?`${K*.014} ${K*.01}`:'');if(o.l)s+=lab(LX,o.y*H<fs*1.6?o.y*H+fs*1.2:o.y*H-fs*.45,o.l,c)}
+    else if(o.t==='v'){s+=ln(o.x*W,0,o.x*W,H,c,sw*(o.dash?1:1.4),o.dash?`${K*.014} ${K*.01}`:'');if(o.l)s+=lab(o.x*W+fs*.4,VY,o.l,c)}
+    else if(o.t==='pt'){s+=`<circle cx="${o.x*W}" cy="${o.y*H}" r="${K*.014}" fill="none" stroke="${c}" stroke-width="${sw*1.4}"/><circle cx="${o.x*W}" cy="${o.y*H}" r="${K*.004}" fill="${c}"/>`;if(o.l){const right=o.x<.62;s+=lab(o.x*W+(right?1:-1)*K*.025,o.y*H+fs*.35,o.l,c,right?'start':'end')}}
+    else if(o.t==='box'){s+=`<rect x="${o.x*W}" y="${o.y*H}" width="${o.w*W}" height="${o.h*H}" fill="none" stroke="${c}" stroke-width="${sw*1.3}" stroke-dasharray="${K*.008} ${K*.006}"/>`;if(o.l){const right=o.x<.55;s+=lab(right?(o.x+o.w)*W+K*.02:o.x*W-K*.02,(o.y+o.h*.5)*H+fs*.35,o.l,c,right?'start':'end')}}
+    else if(o.t==='line'){s+=ln(o.a[0]*W,o.a[1]*H,o.b[0]*W,o.b[1]*H,c,sw*1.4,`${K*.014} ${K*.008}`)}
+    else if(o.t==='rect'){s+=`<rect x="${o.x*W}" y="${o.y*H}" width="${o.w*W}" height="${o.h*H}" fill="rgba(120,170,255,.16)" stroke="${c}" stroke-width="${sw}" stroke-dasharray="${K*.012} ${K*.008}"/>`;if(o.l)s+=lab((o.x+o.w/2)*W,(o.y+o.h/2)*H+fs*.35,o.l,'#fff','middle')}
+    else if(o.t==='ell'){s+=`<ellipse cx="${o.x*W}" cy="${o.y*H}" rx="${o.rx*W}" ry="${o.ry*H}" fill="none" stroke="${c}" stroke-width="${sw*1.4}" stroke-dasharray="${K*.014} ${K*.008}"/>`;if(o.l)s+=lab(o.x*W,(o.y-o.ry)*H-fs*.4,o.l,c,'middle')}
+    else if(o.t==='poly'&&o.open){s+=`<polyline points="${o.pts.map(([a,b])=>a*W+','+b*H).join(' ')}" fill="none" stroke="${c}" stroke-width="${sw*1.6}" stroke-dasharray="${K*.012} ${K*.007}"/>`;o.pts.forEach(([a,b])=>s+=`<circle cx="${a*W}" cy="${b*H}" r="${K*.009}" fill="${c}"/>`)}
+    else if(o.t==='poly'){s+=`<polygon points="${o.pts.map(([a,b])=>a*W+','+b*H).join(' ')}" fill="rgba(227,181,91,.12)" stroke="${c}" stroke-width="${sw*1.3}" stroke-dasharray="${K*.012} ${K*.007}"/>`;o.pts.forEach(([a,b])=>s+=`<circle cx="${a*W}" cy="${b*H}" r="${K*.009}" fill="${c}"/>`);if(o.l)s+=lab(o.pts[0][0]*W+K*.025,o.pts[0][1]*H-fs*.3,o.l,c)}
+    else if(o.t==='curve'){const P=o.pts.map(([a,b])=>[a*W,b*H]);s+=`<path d="${smooth(P)}" fill="none" stroke="${c}" stroke-width="${K*.03}" opacity=".18" stroke-linecap="round"/><path d="${smooth(P)}" fill="none" stroke="${c}" stroke-width="${sw*1.4}" stroke-dasharray="${K*.014} ${K*.008}"/>`;if(o.l){const e=P[P.length-1];s+=lab(e[0]+K*.02,e[1]-fs*.2,o.l,c)}}
+    else if(o.t==='bands'){const tints=['rgba(120,170,255,.16)','rgba(227,181,91,.14)','rgba(61,220,132,.16)'];o.b.forEach(([a,b,l],i)=>{s+=`<rect x="0" y="${a*H}" width="${W}" height="${(b-a)*H}" fill="${tints[i]}"/>`;if(a>0)s+=ln(0,a*H,W,a*H,C.w,sw,`${K*.014} ${K*.01}`);s+=lab(LX,a*H+fs*1.3,`${['①','②','③'][i]} ${l}`,'#fff')})}
+  }return s}
+const LBL=a=>Object.fromEntries(a);const SCN=LBL(SCENES),SCL=LBL(SCALES),CMP=LBL(COMPS);
+function scaleIcon(k){const box=`<rect x="1" y="1" width="28" height="36" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>`;
+  const f=(top,h,cx=15)=>`<clipPath id="cl${k}"><rect x="1" y="1" width="28" height="36"/></clipPath><g clip-path="url(#cl${k})">${fig(cx,top,h,'currentColor','currentColor','')}</g>`;
+  const m={all:`<path d="M10 1v36M20 1v36M1 13h28M1 25h28" stroke="currentColor" stroke-width=".8" opacity=".6"/>`,close:f(5,130),half:f(5,62),cowboy:f(5,52),full:f(4,32),tiny:`<path d="M1 27h28" stroke="currentColor" stroke-width=".8" opacity=".7"/>`+f(21,6.5,21)};
+  return `<svg viewBox="0 0 30 38" aria-hidden="true" style="color:inherit">${m[k]}${box}</svg>`}
+function renderGallery(){
+  const F=S.f;
+  $('#fScale').innerHTML=SCALES.map(([k,l])=>`<button class="sbtn" aria-pressed="${k===F.pr}" data-v="${k}">${scaleIcon(k)}<span>${l}</span></button>`).join('');
+  $('#fScene').innerHTML=SCENES.map(([k,l])=>`<button class="chip" aria-pressed="${k===F.sc}" data-v="${k}">${l}</button>`).join('');
+  $('#fComp').innerHTML=COMPS.map(([k,l])=>`<button class="chip" aria-pressed="${k===F.cp}" data-v="${k}">${l}</button>`).join('');
+  [['#fScale','pr'],['#fScene','sc'],['#fComp','cp']].forEach(([id,key])=>$(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{F[key]=b.dataset.v;renderGallery()}));
+  const list=PHOTOS.filter(p=>(F.sc==='all'||p.sc===F.sc)&&(F.pr==='all'||p.pr===F.pr)&&(F.cp==='all'||p.cp.includes(F.cp)));
+  const any=F.sc!=='all'||F.pr!=='all'||F.cp!=='all';
+  $('#fCount').innerHTML=`<span>共 <b>${list.length}</b> / ${PHOTOS.length} 张样片</span>${any?'<button id="fReset">清除筛选</button>':''}`;
+  if(any)$('#fReset').onclick=()=>{S.f={sc:'all',pr:'all',cp:'all'};renderGallery()};
+  if(!list.length){$('#gal').innerHTML=`<div class="card empty">这个组合暂时没有样片。<br>换一个场景或构图试试，或者清除筛选。</div>`;return}
+  $('#gal').innerHTML=list.map(p=>{const[iw,ih]=IMGDIM[p.k];const W=1000,H=Math.round(1000*ih/iw);const on=S.xray[p.k]!==false;
+    return `<article class="card gcard"><div class="gimg"><img src="${IMG[p.k]}" alt="${esc(p.title)}" loading="lazy" width="${iw}" height="${ih}"><svg viewBox="0 0 ${W} ${H}" class="${on?'':'off'}" aria-hidden="true">${opsSvg(p,W,H)}</svg></div>
+    <div class="gbody"><div class="gtitle"><h3>${esc(p.title)}</h3><span class="gmeta">${p.ratio} · ${p.focal}</span></div>
+    <div class="gtags"><span class="ts">${SCN[p.sc]}</span><span class="tp">${SCL[p.pr]} · ${esc(p.prt)}</span>${p.cp.map(c=>`<span>${CMP[c]}</span>`).join('')}</div><p class="gtip">${esc(p.tip)}</p>
+    <div class="gact"><button class="xbtn" data-k="${p.k}" aria-pressed="${on}"><span class="sw"></span>透视切线</button><button class="gobtn" data-go="${p.k}">带入取景器同款</button></div></div></article>`}).join('');
+  $('#gal').querySelectorAll('.xbtn').forEach(b=>b.onclick=()=>{const k=b.dataset.k,on=S.xray[k]===false;S.xray[k]=on;b.setAttribute('aria-pressed',on);b.closest('.gcard').querySelector('.gimg svg').classList.toggle('off',!on)});
+  $('#gal').querySelectorAll('.gobtn').forEach(b=>b.onclick=()=>importToVF(PMAP[b.dataset.go]));
+}
+
+/* ---------- Subjects ---------- */
+S.scat='all';S.subk='tree';
+const TIPICON={angle:'<path d="M4 20 20 4M4 20h8M4 20v-8"/>',comp:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>',light:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',person:'<circle cx="12" cy="6" r="3"/><path d="M6 21v-4a6 6 0 0 1 12 0v4"/>'};
+const TIPNAME={angle:'角度机位',comp:'构图要点',light:'光线时机',person:'加入人物怎么拍'};
+function renderSubjects(){
+  $('#subCats').innerHTML=SUBCATS.map(([k,l])=>`<button class="chip" aria-pressed="${k===S.scat}" data-v="${k}">${l}</button>`).join('');
+  $('#subCats').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.scat=b.dataset.v;const L=SUBJECTS.filter(x=>S.scat==='all'||x.cat===S.scat);if(!L.find(x=>x.k===S.subk))S.subk=L[0].k;renderSubjects()});
+  const L=SUBJECTS.filter(x=>S.scat==='all'||x.cat===S.scat);
+  $('#subStrip').innerHTML=L.map(x=>`<button class="sub" aria-pressed="${x.k===S.subk}" data-k="${x.k}"><img src="${THUMB[x.k]}" alt=""><span>${x.name}</span></button>`).join('');
+  $('#subStrip').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.subk=b.dataset.k;renderSubjects()});
+  const p=SMAP[S.subk],[iw,ih]=IMGDIM[p.k],W=1000,H=Math.round(1000*ih/iw),on=S.xray[p.k]!==false;
+  $('#subDetail').innerHTML=`<article class="card gcard"><div class="gimg"><img src="${IMG[p.k]}" alt="${esc(p.title)}" width="${iw}" height="${ih}"><svg viewBox="0 0 ${W} ${H}" class="${on?'':'off'}" aria-hidden="true">${opsSvg(p,W,H)}</svg></div>
+   <div class="gbody"><div class="gtitle"><h3>${esc(p.title)}</h3><span class="gmeta">${p.ratio} · ${p.focal}</span></div>
+   <div class="gact"><button class="xbtn" id="subX" aria-pressed="${on}"><span class="sw"></span>透视切线</button><button class="gobtn" id="subGo">带入取景器练习</button></div></div>
+   <div class="sd-tips">${['angle','comp','light','person'].map(t=>`<div class="tipg"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">${TIPICON[t]}</svg></span><h4>${TIPNAME[t]}</h4><ul>${p[t].map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>
+   <div class="sd-verse"><div class="verse">${esc(p.verse)}</div></div></article>`;
+  $('#subX').onclick=()=>{const on=S.xray[p.k]===false;S.xray[p.k]=on;renderSubjects()};
+  $('#subGo').onclick=()=>importToVF(p);
+}
+
+/* ---------- AI coach (mock) ---------- */
+const PLANS=[
+ {name:'川西雪山大草甸大景小人',q:'川西雪山脚下的大草甸，下午顺光，想拍大景小人',photo:'snow',ratio:'16:9',guide:'small',focal:'24mm',
+  a:[['竖构图 4:5 发小红书，横构图 16:9 做壁纸','大景小人：人物只占画高 1/9','雪山主峰压上三分线，人物放在下三分交点','草甸花丛做前景，画面底部留 1/5'],
+     [['g','全身完整入画，脚底留出草地，不切脚踝'],['g','人物头顶与雪山之间留出天空缝隙'],['r','避免山脊线从头顶或脖子穿过'],['r','别让远处电线杆和人头重叠']],
+     ['24mm 广角，低机位：镜头离地 30–50cm，微仰','人物距离 15–25m，让雪山显得更高大','想压缩空间就换 70–200mm 长焦，站到 50m 外','顺光拍色彩，侧逆光拍轮廓'],
+     ['背身走、回头望，裙摆随风扬','双臂展开看远方，人越小，山越壮','穿红、黄、白等高饱和色，从绿草白雪里跳出来']]},
+ {name:'海边悬崖落日地平线',q:'海边悬崖，日落前半小时，逆光，想拍剪影',photo:'sea',ratio:'9:16',guide:'horizon',focal:'35mm',
+  a:[['9:16 竖幅突出天空层次，或 16:9 横幅讲故事','海平线放在下三分，天空占 2/3','人物剪影落在左或右三分竖线上'],
+     [['r','海平线绝对不能穿过脖子或眼睛'],['g','蹲低让海平线落到腰下，或站高压到头顶上'],['g','剪影的手、脚和身体分开，留出缝隙'],['r','人物不要站在悬崖边缘的剪影交界处']],
+     ['平视或低机位，35mm 环境人像','人物距离 5–8m','对着天空测光，曝光补偿 −1EV，剪影更干净','日落前 20 分钟开始拍，云彩最丰富'],
+     ['侧身对光、下巴微抬，手离身体一拳开','风吹发丝别去管，剪影轮廓才清白','走两步再回头，比站着更自然']]},
+ {name:'咖啡馆靠窗清冷感',q:'咖啡馆靠窗位置，阴天柔光，想拍清冷感半身',photo:'cafe',ratio:'4:5',guide:'thirds',focal:'50mm',
+  a:[['4:5 或 3:4 竖幅','三分法：眼睛落在上三分交点','窗框当作画中画，框住人物','视线方向一侧多留空间'],
+     [['g','半身切在胸腔下沿，七分身切大腿中段'],['r','桌沿不要卡在手腕或手肘上'],['r','吊灯、窗框竖线别从头顶长出来'],['g','咖啡杯只露一半做前景，增加层次']],
+     ['平视或微俯，镜头略高于眼睛 10cm','50mm 或 85mm，光圈 f/1.8','距离人物 1.5–2.5m','窗光从侧前方 45° 打过来，脸背光一侧留暗部'],
+     ['手托杯，不碰脸，眼看窗外三秒钟','肩放松，背挺直，下巴往前再微收','清冷感别笑太开，嘴角放松就好']]},
+ {name:'霓虹街景倒影',q:'雨后夜晚的霓虹街道，地面有积水，想拍倒影人像',photo:'city',ratio:'9:16',guide:'cowboy',focal:'35mm',
+  a:[['9:16 竖幅，适合手机全屏','上 2/3 实景，下 1/3 留给倒影','霓虹招牌做背景光斑'],
+     [['g','七分身切大腿中段，或全身入画'],['r','脚踝别被水洼边缘截断'],['r','招牌竖杆、电线杆别压在头顶'],['g','倒影里的人物也要完整，不切头']],
+     ['低机位：手机倒置，镜头贴近水面 5cm','35mm，人物距离 3–4m','ISO 拉高到 800–1600，快门不低于 1/60','对焦在人物脸上，不对倒影'],
+     ['侧身走，慢回头，伞柄斜握别挡脸','霓虹落在肩膀后，眼神看光不看镜头','一只脚踩进水洼边，倒影更有戏']]}
+];
+const SEC=['画幅与黄金构图','裁切线规范（绿线与红线）','机位高度与焦段','模特美姿与情绪口诀'];
+function matchPlan(q){const t=q||'';const rules=[[/雪|山|草甸|高原|川西|冰川/,0],[/海|日落|落日|悬崖|沙滩|剪影|夕阳/,1],[/咖啡|窗|室内|书店|餐厅|清冷/,2],[/霓虹|街|夜|雨|城市|倒影/,3]];for(const[r,i]of rules)if(r.test(t))return PLANS[i];return null}
+function generic(q){return{name:'定制机位方案',q,photo:'beach',ratio:'4:5',guide:'thirds',focal:'50mm',
+  a:[['先定画幅：社交平台用 4:5，大场景用 16:9','人物眼睛放在上三分线','画面里找一条引导线指向人物'],
+     [['g','半身切胸腔下沿，七分身切大腿中段'],['r','不切膝盖、手腕、脚踝、下巴'],['r','地平线别穿过脖子'],['g','头顶留一拳空间']],
+     ['平视为主，拍全身时镜头放到腰部','人像首选 50mm，环境人像用 35mm','人物距离 2–5m'],
+     ['重心放一条腿，另一条腿放松','手找事做：整理头发、拿道具、插口袋','看远处，再慢慢回头看镜头']]}}
+function planText(p){return `【FRAME PRO 机位方案】${p.name}\n现场：${p.q}\n\n`+SEC.map((s,i)=>`${['①','②','③','④'][i]} ${s}\n`+p.a[i].map(x=>'· '+(Array.isArray(x)?(x[0]==='g'?'✓ ':'✗ ')+x[1]:x)).join('\n')).join('\n\n')}
+function renderPlan(p){
+  $('#planBox').innerHTML=`<div class="plan"><div class="plan-head"><div><div class="eyebrow">Shooting Plan</div><h3>${esc(p.name)}</h3></div><span class="badge warn">示例数据</span></div>`+
+   SEC.map((s,i)=>`<div class="card pc"><div class="no">0${i+1}</div><h4>${s}</h4>`+(i===3?`<div>${p.a[3].map(v=>`<div class="verse2">${esc(v)}</div>`).join('')}</div>`:`<ul>${p.a[i].map(x=>Array.isArray(x)?`<li class="${x[0]}">${x[0]==='g'?'✓':'✗'} ${esc(x[1])}</li>`:`<li>${esc(x)}</li>`).join('')}</ul>`)+`</div>`).join('')+
+   `<div class="plan-act"><button class="ghost" id="copyBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>复制方案</button><button class="gobtn" id="planGo" style="height:38px">带入取景器</button></div></div>`;
+  $('#copyBtn').onclick=()=>copy(planText(p));
+  $('#planGo').onclick=()=>{const ph=PMAP[p.photo];importToVF({...ph,ratio:p.ratio,guide:p.guide,focal:p.focal,ops:[]},p.name)};
+}
+function copy(t){const done=()=>toast('机位方案已复制，可粘贴到微信或备忘录');
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();ok?done():toast('复制被浏览器拦截，请长按方案文字手动复制')};
+  try{navigator.clipboard.writeText(t).then(done,fb)}catch(e){fb()}}
+function renderPresets(){$('#aiPresets').innerHTML=PLANS.map((p,i)=>`<button class="chip" aria-pressed="${i===S.preset}" data-i="${i}">${p.name}</button>`).join('');
+  $('#aiPresets').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.preset=+b.dataset.i;$('#aiInput').value=PLANS[S.preset].q;renderPresets()})}
+$('#genBtn').onclick=()=>{const q=$('#aiInput').value.trim();if(!q){toast('先描述一下拍摄现场');$('#aiInput').focus();return}
+  const btn=$('#genBtn');btn.disabled=true;$('#planBox').innerHTML=`<div class="card scan"><div class="bar"></div>正在分析场景、光线与人物站位…</div>`;
+  setTimeout(()=>{const p=matchPlan(q)||generic(q);renderPlan({...p,q});btn.disabled=false},1100)};
+
+/* ---------- init ---------- */
+renderRatio();renderZoom();applyPair(GP.thirds[0]);renderGuides();
+renderCut();renderTraps();renderGallery();renderSubjects();renderPresets();
+$('#aiInput').value=PLANS[0].q;renderPlan(PLANS[0]);
+requestAnimationFrame(fit);
+</script>
+</body></html>
